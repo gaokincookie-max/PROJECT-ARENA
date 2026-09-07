@@ -372,7 +372,7 @@ h2{letter-spacing:.16em;margin:4px 0 18px;font-size:24px}
  <div class="status" id="turnStatus">SIMULATION</div>
  <div class="boardWrap"><div id="battleBoard" class="board"></div></div>
  <div id="battleCutinBackdrop" class="battleCutinBackdrop"></div>
- <div id="battleCutin" class="battleCutin"><img src="assets/blade_intercept.png" alt="BLADE INTERCEPT"></div>
+ <div id="battleCutin" class="battleCutin"><img src="blade_intercept.png" alt="BLADE INTERCEPT"></div>
  <div id="shiftControls" class="shiftControls">
    <button class="shiftDir" onclick="confirmShiftDir('row',-1)">←</button>
    <button class="shiftDir" onclick="confirmShiftDir('row',1)">→</button>
@@ -429,9 +429,9 @@ h2{letter-spacing:.16em;margin:4px 0 18px;font-size:24px}
 
 const GAME_ASSETS={
  blade:{
-  face:"assets/blade_face.png",
-  unit:"assets/blade_unit.png",
-  symbol:"assets/blade_symbol.png"
+  face:"blade_face.png",
+  unit:"blade_unit.png",
+  symbol:"blade_symbol.png"
  }
 };
 function hasGameFace(id){return !!(GAME_ASSETS[id] && GAME_ASSETS[id].face)}
