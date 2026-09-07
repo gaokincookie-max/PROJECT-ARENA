@@ -1,0 +1,1459 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>TACTICAL SIMULATION // Prototype</title>
+<style>
+:root{
+  --bg:#060a10;--panel:#0c121b;--panel2:#101927;--line:#1f3c59;--blue:#45a8ff;
+  --blue2:#8bd0ff;--text:#dcecff;--muted:#6f8296;--red:#ff5b68;--amber:#ffbe5b;
+  --purple:#9d7cff;--green:#6ef0c1;--cell:#0a111a;--cell2:#0d1823;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:radial-gradient(circle at 50% 0,#0b1724,#05080d 55%);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100%;overflow-x:hidden}
+button{font:inherit;color:inherit}
+.screen{display:none;min-height:100dvh;padding:18px 14px 28px}
+.screen.active{display:block}
+.shell{width:min(1100px,100%);margin:auto}
+.topline{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.16em;color:#6f8cab;margin-bottom:14px}
+.brand{font-size:clamp(28px,6vw,62px);letter-spacing:.18em;font-weight:800;text-align:center;margin:12vh 0 8px;text-shadow:0 0 24px #1e6da8}
+.subtitle{text-align:center;color:#6f8296;letter-spacing:.24em;font-size:11px;margin-bottom:44px}
+.menu{display:grid;gap:12px;width:min(480px,92%);margin:auto}
+.btn,.cmd,.card,.tacticBtn,.smallbtn{
+  border:1px solid #234764;background:linear-gradient(180deg,#0f1b28,#091019);box-shadow:inset 0 0 0 1px #0e2b42;
+  border-radius:8px;cursor:pointer;transition:.15s;position:relative;overflow:hidden
+}
+.btn{padding:16px 18px;text-align:left;letter-spacing:.13em;font-weight:700}
+.btn:hover,.cmd.enabled:hover,.smallbtn:hover,.card:hover{border-color:var(--blue);box-shadow:0 0 18px #1679bc55,inset 0 0 0 1px #2b6a98}
+.btn span{float:right;color:#51708a;font-size:12px}
+.back{background:none;border:0;color:#7391ab;padding:8px 0;cursor:pointer;letter-spacing:.1em}
+h2{letter-spacing:.16em;margin:4px 0 18px;font-size:24px}
+.sectionTitle{font-size:12px;letter-spacing:.18em;color:#7aa3c7;margin:18px 0 8px}
+.gridCards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.card{padding:10px;min-height:102px}
+.card.selected{border-color:var(--blue);box-shadow:0 0 18px #168ed055}
+.card .portrait,.unitPortrait{display:grid;place-items:center;background:linear-gradient(135deg,#15263a,#071018);border:1px solid #284d6b}
+.card .portrait{height:54px;border-radius:6px;margin-bottom:7px;font-size:22px}
+.name{font-weight:800;letter-spacing:.08em;font-size:12px}
+.role{font-size:10px;color:#708aa2;margin-top:3px}
+.teamSlots{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.slot{height:72px;border:1px dashed #26465f;border-radius:8px;display:grid;place-items:center;color:#4b6880;font-size:11px;position:relative}
+.slot.filled{border-style:solid;background:#0b1621;color:#dcecff}
+.tactics{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:10px}
+.tacticBtn{padding:12px;text-align:center;border-radius:999px;min-height:58px}
+.tacticBtn.selected{border-color:var(--purple);box-shadow:0 0 18px #7b5cff55}
+.actionRow{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.smallbtn{padding:10px 14px}
+.primary{border-color:#2f85bc;background:linear-gradient(180deg,#123b57,#0a1d2a)}
+.dim{opacity:.4}
+.disabled{pointer-events:none;opacity:.35}
+.matchHeader{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.enemyPanel,.selfPanel{background:#09121b;border:1px solid #19344b;border-radius:10px;padding:8px}
+.enemyUnits{display:flex;gap:6px;flex-wrap:wrap}
+.enemyIcon{width:48px;height:54px;border:1px solid #274865;border-radius:7px;background:#0b1722;display:grid;place-items:center;position:relative;font-size:10px;text-align:center}
+.enemyIcon.dead::after{content:"×";position:absolute;inset:0;display:grid;place-items:center;font-size:46px;color:#ff5b68cc;font-weight:300}
+.enemyIcon.reserve::before{content:"RES";position:absolute;left:2px;top:2px;font-size:7px;color:#8bd0ff}
+.boardWrap{width:min(690px,100%);margin:12px auto}
+.board{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:repeat(6,minmax(0,1fr));aspect-ratio:1/1;border:1px solid #28516f;background:#07111a;box-shadow:0 0 30px #0a5d8b28;touch-action:manipulation;overflow:hidden}
+.cell{position:relative;border:1px solid #132b3e;background:linear-gradient(180deg,#0b151f,#081018);display:grid;place-items:center;min-width:0;min-height:0;overflow:hidden}
+.cell.enemyZone{background:linear-gradient(180deg,#0d1721,#09121b)}
+.cell.playerZone{background:linear-gradient(180deg,#0c1b28,#09131c)}
+.cell.move::after,.cell.attack::after,.cell.deploy::after,.cell.tacticTarget::after{
+ content:"";position:absolute;inset:6px;border:1px solid var(--blue);box-shadow:0 0 10px #2fa8ff66;pointer-events:none
+}
+.cell.attack::after{border-color:var(--red);box-shadow:0 0 10px #ff445566}
+.cell.deploy::after{border-color:var(--green);box-shadow:0 0 10px #35f0bc55}
+.cell.tacticTarget::after{border-color:var(--purple);box-shadow:0 0 10px #8d6bff66}
+.cell.wall{background:repeating-linear-gradient(135deg,#172b3b,#172b3b 6px,#0e1b26 6px,#0e1b26 12px)}
+.cell.break{background:radial-gradient(circle,#020305 0 30%,#0a1118 35% 100%)}
+.cell.locked{box-shadow:inset 0 0 0 2px #9d7cff88}
+.unit{width:76%;max-width:74px;aspect-ratio:1;border-radius:18%;display:grid;place-items:center;border:1px solid #42769c;background:linear-gradient(145deg,#17324a,#09131d 68%);position:relative;z-index:3;box-shadow:0 0 14px #1c79b33d,inset 0 0 0 1px #0d2233;overflow:visible}
+.unit.enemy{border-color:#a94d59;background:linear-gradient(145deg,#40212b,#160c12 68%);box-shadow:0 0 14px #a53c4c35,inset 0 0 0 1px #3e1620}
+.unit.selected{border-color:#9cddff;box-shadow:0 0 22px #4fb8ff,inset 0 0 0 1px #56bfff}
+.unit.stance::after{content:"";position:absolute;inset:-5px;border:1px solid var(--amber);border-radius:22%;box-shadow:0 0 14px #ffb53d88;pointer-events:none}
+.unit.charged::before{content:"CHG";position:absolute;bottom:-10px;left:50%;transform:translateX(-50%);font-size:6px;letter-spacing:.08em;color:var(--amber);background:#0a1017;padding:1px 3px;border-radius:3px}
+.unit.deploySick::before{content:"NEW";position:absolute;top:-9px;left:50%;transform:translateX(-50%);font-size:6px;letter-spacing:.08em;color:var(--green);background:#07110e;padding:1px 3px;border-radius:3px}
+.unitFace{position:absolute;inset:10% 14% 28%;border-radius:40% 40% 34% 34%;background:linear-gradient(180deg,#b9d7eb22,#071018 78%);border:1px solid #7db7df44;overflow:hidden}
+.unit.enemy .unitFace{border-color:#e4808b55;background:linear-gradient(180deg,#d7949b22,#14080d 78%)}
+.unitFace::before{content:"";position:absolute;width:42%;height:42%;left:29%;top:18%;border-radius:50%;background:#8fc9ec55;box-shadow:0 14px 0 4px #4b769555}
+.unit.enemy .unitFace::before{background:#df7f8a55;box-shadow:0 14px 0 4px #87465355}
+.unitRole{position:absolute;right:3px;top:3px;width:17px;height:17px;border:1px solid #72b9e7aa;border-radius:4px;display:grid;place-items:center;font-size:9px;color:#bce6ff;background:#07121bcc}
+.unit.enemy .unitRole{border-color:#e77783aa;color:#ffd0d5;background:#1a090dcc}
+.unitCode{position:absolute;left:4px;right:4px;bottom:3px;text-align:center;font-size:clamp(7px,1.8vw,10px);font-weight:900;letter-spacing:.08em;color:#dff2ff;text-shadow:0 1px 2px #000;white-space:nowrap;overflow:hidden}
+.unit.enemy .unitCode{color:#ffe0e3}
+.unitAccent{position:absolute;left:4px;top:4px;width:3px;height:18px;border-radius:3px;background:#55bfff;box-shadow:0 0 8px #55bfff}
+.unit.enemy .unitAccent{background:#ff6876;box-shadow:0 0 8px #ff6876}
+.hud{width:min(760px,100%);margin:10px auto;background:#09121b;border:1px solid #193a54;border-radius:12px;padding:10px}
+.apbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.pips{display:flex;gap:7px}
+.pip{width:13px;height:13px;border-radius:50%;border:1px solid #426b87;background:#15304a}
+.pip.on{background:#68bfff;box-shadow:0 0 10px #4bb6ff}
+.commands{display:grid;grid-template-columns:repeat(6,1fr);gap:7px}
+.cmd{height:58px;padding:6px;border-color:#17344b;color:#4b6174;font-size:10px;letter-spacing:.08em}
+.cmd::before{content:attr(data-icon);position:absolute;right:6px;bottom:-8px;font-size:34px;opacity:.08}
+.cmd.enabled{color:#dbeeff;border-color:#315875}
+.cmd.active{border-color:var(--blue);box-shadow:0 0 14px #2f9de050}
+.cmd.tactic{border-radius:50%;aspect-ratio:1;height:auto;border-color:#594e81;color:#a59cc5}
+.cmd.tactic.enabled{color:#e2dcff;border-color:#8b71dd;box-shadow:0 0 12px #7c5ee044}
+.status{min-height:24px;text-align:center;color:#8eb5d3;font-size:12px;letter-spacing:.06em;margin:6px 0}
+.overlay{position:fixed;inset:0;background:#03070bdc;display:none;place-items:center;z-index:20;padding:20px}
+.overlay.show{display:grid}
+.modal{width:min(520px,100%);border:1px solid #2d5776;background:#09121b;border-radius:12px;padding:18px;box-shadow:0 0 40px #0a75b044}
+.big{text-align:center;font-size:clamp(28px,9vw,64px);font-weight:900;letter-spacing:.16em}
+.small{text-align:center;color:#7092ad;letter-spacing:.14em;font-size:11px}
+.coin{width:110px;aspect-ratio:1;border-radius:50%;border:2px solid #4daee8;margin:20px auto;display:grid;place-items:center;box-shadow:0 0 30px #2b9fea55;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotateY(720deg) rotateZ(180deg)}}
+.detailGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.miniBoard{display:grid;grid-template-columns:repeat(7,18px);gap:2px;justify-content:center}
+.miniBoard span{width:18px;height:18px;border:1px solid #163248;background:#071018}
+.miniBoard .on{background:#174a70;border-color:#56b9ef}
+.miniBoard .atk{background:#5a1c26;border-color:#ff6573}
+.miniBoard .me{background:#d6ecff;border-color:white}
+.note{font-size:11px;color:#7d95aa;line-height:1.55}
+@media(max-width:650px){
+ .screen{padding:10px 8px 18px}
+ .commands{grid-template-columns:repeat(3,1fr)}
+ .cmd.tactic{border-radius:10px;aspect-ratio:auto;height:58px}
+ .enemyIcon{width:42px;height:48px}
+ .hud{padding:8px}
+ .boardWrap{margin:7px auto}
+}
+
+.teamTop{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}
+.teamPresetBar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.presetNav{width:34px;height:34px;border-radius:7px;border:1px solid #24445f;background:#0a1420;cursor:pointer;color:var(--text)}
+.presetName{flex:1;border:1px solid #24445f;background:#0a1420;border-radius:8px;padding:9px 10px;color:var(--text);font:inherit;letter-spacing:.08em}
+.teamSlots.compact{grid-template-columns:repeat(5,minmax(54px,1fr))}
+.teamSlots.compact .slot{height:64px;font-size:9px;padding:4px;text-align:center}
+.tacticOrb{width:88px;height:88px;border-radius:50%;border:1px solid #7863b4;background:radial-gradient(circle,#17142d,#0a0d16 70%);box-shadow:0 0 18px #7b5cff33;display:grid;place-items:center;cursor:pointer;text-align:center;padding:7px}
+.tacticOrb .orbIcon{font-size:26px;line-height:1;color:#d7ceff}
+.tacticOrb .orbName{font-size:9px;letter-spacing:.08em;margin-top:4px}
+.detailPanel{margin-top:12px;border:1px solid #23445f;border-radius:12px;background:linear-gradient(180deg,#0b1621,#091018);padding:14px;min-height:300px}
+.detailHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+.detailTitle{font-size:24px;font-weight:900;letter-spacing:.1em}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.tag{border:1px solid #2a5573;border-radius:999px;padding:3px 7px;font-size:8px;letter-spacing:.1em;color:#9ccff2}
+.detailBody{display:grid;grid-template-columns:160px 1fr;gap:14px}
+.bigPortrait{height:180px;border:1px solid #284d6b;border-radius:10px;background:linear-gradient(145deg,#17314a,#081018 70%);display:grid;place-items:center;position:relative;overflow:hidden;font-size:56px}
+.bigPortrait::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,#06101bcc)}
+.statCols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rangeBox{border:1px solid #183850;border-radius:8px;padding:8px;background:#071018}
+.rangeTitle{font-size:9px;letter-spacing:.14em;color:#7aa3c7;margin-bottom:6px}
+.rangeGrid{display:grid;grid-template-columns:repeat(7,16px);gap:2px;justify-content:center}
+.rangeGrid span{width:16px;height:16px;border:1px solid #153248;background:#08111a}
+.rangeGrid .self{background:#d9edff;border-color:#fff}
+.rangeGrid .moveOn{background:#174a70;border-color:#56b9ef}
+.rangeGrid .atkOn{background:#5a1c26;border-color:#ff6573}
+.explainBox{margin-top:10px;border-top:1px solid #17344b;padding-top:10px}
+.explainName{font-size:11px;font-weight:800;letter-spacing:.08em;color:#cfeaff}
+.explainText{font-size:11px;line-height:1.65;color:#8fa8bb;margin-top:4px}
+.charScroller{margin-top:12px;border-top:1px solid #17344b;padding-top:10px}
+.charRows{display:grid;grid-template-rows:repeat(2,92px);grid-auto-flow:column;grid-auto-columns:120px;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+.charMini{border:1px solid #23445f;border-radius:9px;background:#0a1420;padding:8px;cursor:pointer;position:relative}
+.charMini.active{border-color:#65bfff;box-shadow:0 0 16px #46a9e744}
+.charMini.assigned::after{content:"ASSIGNED";position:absolute;right:5px;top:5px;font-size:6px;color:#7ee4ff;letter-spacing:.08em}
+.charMini .miniIcon{font-size:24px;height:38px;display:grid;place-items:center}
+.charMini .miniName{font-size:9px;font-weight:800;letter-spacing:.06em;text-align:center}
+.teamAction{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+.tacticSelectGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px}
+.tacticChoice{border:1px solid #51467a;border-radius:14px;background:#0a0d16;padding:10px;text-align:center;cursor:pointer}
+.tacticChoice.active{border-color:#9d7cff;box-shadow:0 0 18px #7c5ee055}
+.tacticChoice .roundIcon{width:54px;height:54px;border-radius:50%;border:1px solid #7b68b0;margin:0 auto 8px;display:grid;place-items:center;font-size:22px;background:#151126}
+.tacticDesc{margin-top:12px;border:1px solid #3a315e;background:#0b0d17;border-radius:10px;padding:12px}
+@media(max-width:700px){
+ .teamTop{grid-template-columns:1fr}
+ .tacticOrb{width:78px;height:78px}
+ .detailBody{grid-template-columns:1fr}
+ .bigPortrait{height:120px}
+ .statCols{grid-template-columns:1fr 1fr}
+ .charRows{grid-auto-columns:105px}
+}
+
+
+.editorTabs{display:flex;gap:8px;margin-top:10px}
+.editorTab{flex:1;border:1px solid #24445f;background:#0a1420;border-radius:8px;padding:9px;cursor:pointer;text-align:center;font-size:10px;letter-spacing:.12em;color:#6f8aa0}
+.editorTab.active{border-color:#62b9ef;color:#dff2ff;box-shadow:0 0 14px #43a4df33}
+.tacticRows{display:grid;grid-auto-flow:column;grid-auto-columns:115px;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+.tacticMini{border:1px solid #51467a;border-radius:12px;background:#0b0d17;padding:9px;cursor:pointer;position:relative;text-align:center}
+.tacticMini.active{border-color:#9d7cff;box-shadow:0 0 16px #7c5ee044}
+.tacticMini.equipped::after{content:"EQUIPPED";position:absolute;right:5px;top:5px;font-size:6px;color:#cabdff;letter-spacing:.08em}
+.tacticMini .roundMini{width:42px;height:42px;border-radius:50%;border:1px solid #7762aa;margin:0 auto 7px;display:grid;place-items:center;background:#151126;font-size:18px}
+.tacticDiagram{display:grid;grid-template-columns:repeat(6,22px);grid-template-rows:repeat(6,22px);gap:2px;justify-content:center;margin-top:8px}
+.tacticDiagram span{width:22px;height:22px;border:1px solid #17344b;background:#08111a;position:relative}
+.tacticDiagram .src{background:#d9edff;border-color:#fff}
+.tacticDiagram .dst{background:#2f2456;border-color:#9d7cff}
+.tacticDiagram .wallCell{background:repeating-linear-gradient(135deg,#273b4d,#273b4d 4px,#111c27 4px,#111c27 8px);border-color:#67b5ea}
+.tacticDiagram .breakCell{background:radial-gradient(circle,#010203 0 35%,#10151c 38% 100%);border-color:#6d7a88}
+.tacticDiagram .lockCell{box-shadow:inset 0 0 0 2px #9d7cff88}
+.tacticDiagram .arrow::after{content:"→";position:absolute;inset:0;display:grid;place-items:center;color:#9d7cff;font-size:15px}
+
+
+.guideZone{position:absolute;inset:3px;border-radius:5px;pointer-events:none;z-index:1}
+.guideZone.ally{border:1px solid rgba(90,185,255,.30);background:rgba(70,150,220,.06)}
+.guideZone.enemy{border:1px solid rgba(255,92,105,.38);background:rgba(255,70,90,.08)}
+.guideZone.enemyStrong{border:2px solid rgba(255,92,105,.82);background:rgba(255,70,90,.14)}
+.guideZone.guard{border-style:dashed}
+.reactionBadge{position:absolute;right:2px;top:2px;min-width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:900;z-index:6;border:1px solid rgba(255,255,255,.55);background:#111820}
+.reactionBadge.evade{color:#7bd7ff}
+.reactionBadge.counter{color:#ffd16a}
+.reactionBadge.guard{color:#8ecbff}
+.escapeLine{position:absolute;left:50%;top:50%;width:34px;height:2px;background:rgba(103,210,255,.88);transform-origin:0 50%;z-index:5;pointer-events:none}
+.escapeLine::after{content:"";position:absolute;right:-1px;top:-4px;border-left:7px solid rgba(103,210,255,.95);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.stanceMark{position:absolute;left:2px;bottom:2px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:10px;z-index:6;border:1px solid rgba(255,255,255,.35);background:#0a111a}
+.settingRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #17344b}
+.settingRow:last-child{border-bottom:none}
+.settingLabel{font-size:11px;letter-spacing:.08em}
+.settingDesc{font-size:9px;color:#6f8aa0;margin-top:3px}
+.settingSelect{min-width:150px;background:#09131d;color:#dceeff;border:1px solid #294760;border-radius:7px;padding:8px}
+
+
+.tacticSourceRing{position:absolute;inset:2px;border:2px solid rgba(185,145,255,.95);border-radius:7px;box-shadow:0 0 14px rgba(160,110,255,.55),inset 0 0 10px rgba(150,100,255,.12);z-index:7;pointer-events:none}
+.tacticSourceRing::after{content:"◎";position:absolute;right:-7px;top:-8px;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:#1b1330;border:1px solid #b897ff;color:#e8dcff;font-size:10px}
+.warpDest{position:absolute;inset:4px;border:1px solid rgba(170,130,255,.9);border-radius:5px;background:rgba(126,84,210,.14);box-shadow:inset 0 0 10px rgba(160,110,255,.18);z-index:2;pointer-events:none}
+.warpDest::after{content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);border:1px solid rgba(225,210,255,.95)}
+
+
+.pushDest{position:absolute;inset:5px;border:2px solid rgba(96,190,255,.85);border-radius:5px;background:rgba(70,150,220,.12);z-index:2;pointer-events:none}
+.pushSource{position:absolute;inset:2px;border:2px solid rgba(96,190,255,.95);border-radius:7px;box-shadow:0 0 12px rgba(70,170,255,.5);z-index:7;pointer-events:none}
+.shiftCrossRow{position:absolute;left:1px;right:1px;top:50%;height:3px;transform:translateY(-50%);background:rgba(176,132,255,.55);z-index:2;pointer-events:none}
+.shiftCrossCol{position:absolute;top:1px;bottom:1px;left:50%;width:3px;transform:translateX(-50%);background:rgba(176,132,255,.55);z-index:2;pointer-events:none}
+.shiftSelected{position:absolute;inset:2px;border:2px solid rgba(190,150,255,.95);border-radius:7px;box-shadow:0 0 14px rgba(155,105,255,.5);z-index:5;pointer-events:none}
+.shiftControls{display:none;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0 2px}
+.shiftControls.active{display:grid}
+.shiftDir{min-height:44px;border:1px solid #66519a;background:#121021;color:#e6dcff;border-radius:8px;font-size:22px;cursor:pointer}
+.shiftDir:hover{border-color:#9c7ce8}
+
+
+.lockPreview{position:absolute;inset:2px;border:2px solid rgba(170,130,255,.9);background:rgba(120,80,200,.12);z-index:3;pointer-events:none}
+.lockAnchor{position:absolute;inset:2px;border:2px solid rgba(210,180,255,.98);box-shadow:0 0 12px rgba(170,120,255,.45);z-index:5;pointer-events:none}
+
+
+.unitArt{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);object-fit:contain;z-index:2;image-rendering:auto;pointer-events:none}
+.unit.enemy .unitArt{filter:saturate(.8) hue-rotate(145deg)}
+.unit.hasArt .unitFace,.unit.hasArt .unitRole{display:none}
+.assetFace{width:100%;height:100%;object-fit:cover;display:block}
+.charMini .miniIcon.hasPortrait{height:48px;border-radius:7px;overflow:hidden;background:#071018;border:1px solid #23445f}
+.charMini .miniIcon.hasPortrait img{width:100%;height:100%;object-fit:cover}
+.bigPortrait.hasAsset{padding:0}
+.bigPortrait.hasAsset img{width:100%;height:100%;object-fit:cover;display:block}
+.enemyIcon .enemyPortrait{width:26px;height:26px;object-fit:cover;border-radius:5px;display:block;margin:0 auto 2px}
+.teamSlotPortrait{width:30px;height:30px;border-radius:5px;object-fit:cover;display:block;margin:0 auto 3px}
+.classSymbolMini{width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:7px}
+
+
+.unitCode{z-index:8;background:rgba(4,10,16,.72);border-radius:4px;padding:1px 2px}
+
+
+.setupPortrait{overflow:hidden}
+.setupPortrait .setupFace{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.unitCode{
+  top:auto !important;
+  bottom:2px !important;
+  left:3px !important;
+  right:3px !important;
+  z-index:50 !important;
+  background:rgba(3,8,14,.88) !important;
+  border:1px solid rgba(120,190,235,.32);
+  border-radius:4px;
+  padding:1px 2px !important;
+  line-height:1.15;
+  text-shadow:0 1px 2px #000;
+  pointer-events:none;
+}
+.unitArt{z-index:2 !important}
+
+
+.battleCutin{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%) scale(.98);
+  width:min(94%,980px);
+  z-index:200;
+  pointer-events:none;
+  opacity:0;
+  filter:drop-shadow(0 0 18px rgba(70,145,255,.32));
+}
+.battleCutin.show{animation:cutinFlash .72s ease-out forwards}
+.battleCutin img{display:block;width:100%;height:auto}
+.battleCutinBackdrop{
+  position:absolute;inset:0;z-index:190;pointer-events:none;
+  background:rgba(0,5,12,.34);opacity:0
+}
+.battleCutinBackdrop.show{animation:cutinBackdrop .72s ease-out forwards}
+@keyframes cutinFlash{
+  0%{opacity:0;transform:translate(-56%,-50%) scale(.96)}
+  10%{opacity:1;transform:translate(-50%,-50%) scale(1.01)}
+  72%{opacity:1}
+  100%{opacity:0;transform:translate(-48%,-50%) scale(1)}
+}
+@keyframes cutinBackdrop{
+  0%{opacity:0}
+  12%{opacity:1}
+  76%{opacity:1}
+  100%{opacity:0}
+}
+
+</style>
+  <!-- GitHub Pages build: external assets -->
+</head>
+<body>
+<div id="title" class="screen active">
+ <div class="shell">
+  <div class="topline"><span>TACTICAL EDUCATION NETWORK</span><span>PROTO // 0.1</span></div>
+  <div class="brand">PROJECT ARENA</div>
+  <div class="subtitle">TACTICAL SIMULATION SYSTEM</div>
+  <div class="menu">
+   <button class="btn" onclick="show('vs')">PLAY <span>VS MODE</span></button>
+   <button class="btn" onclick="show('team')">TEAM <span>UNIT CONFIGURATION</span></button>
+   <button class="btn" onclick="show('guide')">GUIDE <span>DATABASE</span></button>
+   <button class="btn" onclick="show('settings')">SETTINGS <span>SYSTEM</span></button>
+  </div>
+ </div>
+</div>
+
+<div id="vs" class="screen"><div class="shell">
+ <button class="back" onclick="show('title')">← BACK</button><h2>VS MODE</h2>
+ <div class="menu" style="margin-top:10vh">
+  <button class="btn" onclick="startCpuFlow()">CPU MATCH <span>AVAILABLE</span></button>
+  <button class="btn disabled">ONLINE MATCH <span>UNDER DEVELOPMENT</span></button>
+ </div>
+</div></div>
+
+<div id="team" class="screen"><div class="shell">
+ <button class="back" onclick="show('title')">← BACK</button>
+ <div class="topline"><span>UNIT CONFIGURATION</span><span id="presetIndexLabel">TEAM 01 / 05</span></div>
+
+ <div class="teamTop">
+  <div>
+   <div class="teamPresetBar">
+    <button class="presetNav" onclick="changePreset(-1)">←</button>
+    <input id="presetName" class="presetName" value="TEAM 01" onchange="renamePreset(this.value)">
+    <button class="presetNav" onclick="changePreset(1)">→</button>
+   </div>
+   <div class="sectionTitle">CURRENT TEAM // 5 UNITS</div>
+   <div id="teamSlots" class="teamSlots compact"></div>
+  </div>
+  <div>
+   <div class="sectionTitle" style="text-align:center">TACTIC</div>
+   <button id="teamTacticOrb" class="tacticOrb" onclick="setEditorMode('tactics')"></button>
+  </div>
+ </div>
+
+ <div class="editorTabs">
+   <button id="tabUnits" class="editorTab active" onclick="setEditorMode('units')">UNITS</button>
+   <button id="tabTactics" class="editorTab" onclick="setEditorMode('tactics')">TACTIC</button>
+ </div>
+
+ <div id="teamDetail" class="detailPanel"></div>
+
+ <div class="charScroller">
+  <div id="editorListTitle" class="sectionTitle" style="margin-top:0">UNIT DATABASE // TAP TO INSPECT</div>
+  <div id="charRows" class="charRows"></div>
+  <div id="tacticRows" class="tacticRows" style="display:none"></div>
+ </div>
+</div></div>
+
+<div id="setup" class="screen"><div class="shell">
+ <div class="topline"><span>DEPLOYMENT PHASE</span><span id="setupCount">0 / 4</span></div>
+ <div class="sectionTitle">ENEMY CONFIGURATION // VISIBLE</div><div id="setupEnemy" class="enemyUnits"></div>
+ <div class="status">自陣6×2に4体を配置してください。残った1体はUNDEPLOYEDになります。</div>
+ <div class="boardWrap"><div id="setupBoard" class="board"></div></div>
+ <div class="sectionTitle">YOUR UNITS</div><div id="setupUnits" class="gridCards"></div>
+ <div class="actionRow"><button id="readyBtn" class="smallbtn primary disabled" onclick="lockSetup()">READY</button><button class="smallbtn" onclick="show('vs')">CANCEL</button></div>
+</div></div>
+
+<div id="battle" class="screen"><div class="shell" style="position:relative">
+ <div class="matchHeader">
+  <div class="enemyPanel"><div class="sectionTitle" style="margin:0 0 6px">ENEMY TEAM</div><div id="enemyTeamHud" class="enemyUnits"></div></div>
+  <div style="text-align:right;font-size:10px;color:#738da4">TACTIC<br><b id="enemyTacticHud">?</b></div>
+ </div>
+ <div class="status" id="turnStatus">SIMULATION</div>
+ <div class="boardWrap"><div id="battleBoard" class="board"></div></div>
+ <div id="battleCutinBackdrop" class="battleCutinBackdrop"></div>
+ <div id="battleCutin" class="battleCutin"><img src="assets/blade_intercept.png" alt="BLADE INTERCEPT"></div>
+ <div id="shiftControls" class="shiftControls">
+   <button class="shiftDir" onclick="confirmShiftDir('row',-1)">←</button>
+   <button class="shiftDir" onclick="confirmShiftDir('row',1)">→</button>
+   <button class="shiftDir" onclick="confirmShiftDir('col',-1)">↑</button>
+   <button class="shiftDir" onclick="confirmShiftDir('col',1)">↓</button>
+ </div>
+ <div class="hud">
+  <div class="apbar"><div><b>ACTION</b> <span style="font-size:10px;color:#6e8ca7">CAPACITY</span></div><div id="apPips" class="pips"></div></div>
+  <div id="selectionStatus" class="status">SELECT UNIT</div>
+  <div class="commands">
+   <button id="cmdMove" class="cmd" data-icon="➜" onclick="setCommand('move')">MOVE</button>
+   <button id="cmdAttack" class="cmd" data-icon="⚔" onclick="setCommand('attack')">ATTACK</button>
+   <button id="cmdStance" class="cmd" data-icon="◇" onclick="doStance()">STANCE</button>
+   <button id="cmdDeploy" class="cmd" data-icon="⇩" onclick="setCommand('deploy')">DEPLOY</button>
+   <button id="cmdPass" class="cmd enabled" data-icon="—" onclick="endTurn()">PASS</button>
+   <button id="cmdTactic" class="cmd tactic enabled" data-icon="◎" onclick="startTactic()">TACTIC</button>
+  </div>
+ </div>
+</div></div>
+
+<div id="guide" class="screen"><div class="shell">
+ <button class="back" onclick="show('title')">← BACK</button><h2>GUIDE</h2>
+ <div class="card"><div class="name">BASIC RULE</div><p class="note">6×6盤面。5体編成のうち4体を非公開配置し、残り1体は未配置ユニット。1ターン2ACTION。盤面上の自軍ユニットが0になると敗北。同時全滅はDRAW。</p></div>
+ <div class="card" style="margin-top:10px"><div class="name">COMMAND</div><p class="note">MOVE / ATTACK / STANCE / DEPLOY / PASS / TACTIC。TACTICは原則1ACTION消費・1試合1回。</p></div>
+ <div class="card" style="margin-top:10px"><div class="name">STANCE</div><p class="note">構えはキャラ固有の準備状態。多くは一度発動すると解除され、発動しなくても次の自分ターン開始時に解除されます。</p></div>
+</div></div>
+
+<div id="settings" class="screen"><div class="shell">
+ <button class="back" onclick="show('title')">← BACK</button>
+ <div class="topline"><span>SYSTEM SETTINGS</span><span>DISPLAY</span></div>
+ <h2>GUIDE DISPLAY</h2>
+ <div class="card">
+   <div class="settingRow">
+     <div><div class="settingLabel">ALLY STANCE GUIDE</div><div class="settingDesc">自分のターン中、味方の構え範囲を表示します。</div></div>
+     <select id="allyGuideSetting" class="settingSelect" onchange="updateGuideSetting('ally',this.value)">
+       <option value="always">ALWAYS</option>
+       <option value="off">OFF</option>
+     </select>
+   </div>
+   <div class="settingRow">
+     <div><div class="settingLabel">ENEMY REACTION GUIDE</div><div class="settingDesc">敵の迎撃範囲や攻撃時の反応を表示します。</div></div>
+     <select id="enemyGuideSetting" class="settingSelect" onchange="updateGuideSetting('enemy',this.value)">
+       <option value="always">ALWAYS</option>
+       <option value="command">COMMAND ONLY</option>
+       <option value="off">OFF</option>
+     </select>
+   </div>
+ </div>
+</div></div>
+
+<div id="overlay" class="overlay"><div id="overlayContent" class="modal"></div></div>
+
+<script>
+
+const GAME_ASSETS={
+ blade:{
+  face:"assets/blade_face.png",
+  unit:"assets/blade_unit.png",
+  symbol:"assets/blade_symbol.png"
+ }
+};
+function hasGameFace(id){return !!(GAME_ASSETS[id] && GAME_ASSETS[id].face)}
+function hasGameUnit(id){return !!(GAME_ASSETS[id] && GAME_ASSETS[id].unit)}
+function gameFaceImg(id,cls='',extra=''){
+ const a=GAME_ASSETS[id];
+ if(!a||!a.face)return '';
+ return `<img ${cls?`class="${cls}"`:''} src="${a.face}" alt="${CHARS[id]?CHARS[id].name:id}" ${extra}>`;
+}
+function faceAsset(id,cls='assetFace'){return GAME_ASSETS[id]?.face?`<img class="${cls}" src="${GAME_ASSETS[id].face}" alt="${CHARS[id]?.name||id}">`:''}
+
+const CHARS={
+ blade:{name:"BLADE",role:"Close Combat",glyph:"B",icon:"⚔",move:"king",attack:"king",stance:"Adjacent Intercept"},
+ gunner:{name:"GUNNER",role:"Line Control",glyph:"G",icon:"⌖",move:"orth1",attack:"orth2",stance:"Overwatch"},
+ guard:{name:"GUARD",role:"Defense",glyph:"D",icon:"⬡",move:"king",attack:"orth1",stance:"Cover"},
+ scout:{name:"SCOUT",role:"Mobility",glyph:"S",icon:"➤",move:"orth2",attack:"orth1",stance:"Retreat"},
+ cannon:{name:"CANNON",role:"Artillery",glyph:"C",icon:"◉",move:"orth1",attack:"orth1",stance:"Charge"},
+ lancer:{name:"LANCER",role:"Spacing",glyph:"L",icon:"↟",move:"orth1",attack:"orth2exact",stance:"Long Thrust"},
+ duelist:{name:"DUELIST",role:"Counter",glyph:"U",icon:"✦",move:"diag1",attack:"orth1",stance:"Counter"},
+ shifter:{name:"SHIFTER",role:"Support",glyph:"H",icon:"⇄",move:"orth1",attack:"diag1",stance:"Link"}
+};
+const TACTICS={
+ swap:{name:"SWAP",desc:"自分の駒2体の位置を交換。"},
+ wall:{name:"WALL",desc:"空きマス1つを永続障害物にする。射線も遮断。"},
+ shift:{name:"SHIFT",desc:"指定した行/列のキャラを1マス循環移動。"},
+ lock:{name:"LOCK",desc:"2×2範囲への新規侵入を、相手の次の次のターン終了まで拒絶。"},
+ push:{name:"PUSH",desc:"盤面上の駒1体を上下左右へ1マス押す。"},
+ warp:{name:"WARP",desc:"自分の駒1体を自陣6×2の空きマスへ移動。"},
+ break:{name:"BREAK",desc:"空きマス1つを永続侵入不能にする。射線は通る。"}
+};
+
+const CHAR_META={
+ blade:{tags:["MELEE","STANDARD"],desc:"扱いやすい基本近接ユニット。隣接した敵に強く、STANCEでは新たに隣接した最初の敵を迎撃する。",stanceDesc:"構え開始後、新たに隣接マスへ入った最初の敵を攻撃する。"},
+ gunner:{tags:["RANGED","CONTROL"],desc:"直線射撃で通路を制圧する遠距離ユニット。通常射程は2、OVERWATCH中のみ射程3。",stanceDesc:"構え開始後、新たに射線へ入った最初の敵を射程3で攻撃する。"},
+ guard:{tags:["DEFENSE","SUPPORT"],desc:"味方を守る防衛ユニット。攻撃範囲は狭いが、STANCEで隣接味方への攻撃を肩代わりできる。",stanceDesc:"隣接する味方が攻撃された時、代わりにGUARDが攻撃を受ける。"},
+ scout:{tags:["MOBILE","EVASION"],desc:"高い移動力で位置を変え続ける機動ユニット。退路を確保できているほど生存力が上がる。",stanceDesc:"攻撃対象になった時、攻撃者から見て後方1マスが空いていればそこへ退避して回避する。"},
+ cannon:{tags:["ARTILLERY","CHARGE"],desc:"準備を必要とする長距離砲撃ユニット。チャージ後は遠距離を狙えるが、周囲2マス以内は死角になる。",stanceDesc:"CHARGE状態になる。次の自分ターン以降、距離3〜4のマスを射線無視で攻撃できる。MOVEや強制移動で解除。"},
+ lancer:{tags:["SPACING","ASSAULT"],desc:"間合いを押し付ける槍ユニット。通常は2マス先を攻撃し、STANCE後は1マス長い相手にも踏み込んで攻撃できる。",stanceDesc:"次の攻撃射程が1マス延長。延長部分を攻撃する場合、攻撃前にその方向へ1マス自動移動する。"},
+ duelist:{tags:["COUNTER","MELEE"],desc:"相手に攻撃をためらわせる対近接ユニット。移動方向と攻撃方向が異なる。",stanceDesc:"隣接攻撃の対象になった時、相手の攻撃より先に攻撃者へ反撃する。"},
+ shifter:{tags:["SUPPORT","FORMATION"],desc:"陣形ごと前進・後退させる支援ユニット。自分の移動を起点に、周囲の味方をまとめて動かせる。",stanceDesc:"構えた次の自分ターンにSHIFTERがMOVEした場合、移動前に隣接していた味方すべてが同じ方向へ1マス移動を試みる。移動できない味方はその場に残る。"}
+};
+
+const TACTIC_META={
+ swap:{icon:"⇄",detail:"自分の駒2体を選び、位置を交換する。構えやチャージは解除される。"},
+ wall:{icon:"▰",detail:"空きマス1つに永続する壁を設置する。移動不可・射線遮断。"},
+ shift:{icon:"↻",detail:"指定した行または列のキャラを1マス循環移動させる。方向選択可能。"},
+ lock:{icon:"⌗",detail:"2×2範囲への新規侵入を拒絶する。相手の次の次のターン終了まで持続。内部のキャラには干渉しない。"},
+ push:{icon:"➜",detail:"盤面上の駒1体を上下左右へ1マス押す。移動先が埋まっている場合は失敗。"},
+ warp:{icon:"◎",detail:"自分の駒1体を自陣6×2の空きマスへ移動させる。"},
+ break:{icon:"◌",detail:"空きマス1つを永続侵入不能にする。射線は通る。"}
+};
+
+let team=["blade","gunner","guard","scout","cannon"], chosenTactic="shift";
+let setupSel=null, setupPlacements={}, enemySetup={}, battle=null;
+
+function updateGuideSetting(kind,value){
+ guideSettings[kind]=value;
+ syncGuideSettingsUI();
+ if(battle)renderBattle();
+}
+function syncGuideSettingsUI(){
+ let a=document.getElementById('allyGuideSetting'),e=document.getElementById('enemyGuideSetting');
+ if(a)a.value=guideSettings.ally;
+ if(e)e.value=guideSettings.enemy;
+}
+function show(id){
+ document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
+ document.getElementById(id).classList.add('active');
+ if(id==="team")renderTeam();
+ if(id==="settings")syncGuideSettingsUI();
+}
+
+let teamPresets = [
+ {name:"TEAM 01", units:["blade","gunner","guard","scout","cannon"], tactic:"shift"},
+ {name:"TEAM 02", units:["blade","lancer","duelist","scout","guard"], tactic:"wall"},
+ {name:"TEAM 03", units:["gunner","cannon","guard","shifter","scout"], tactic:"lock"},
+ {name:"TEAM 04", units:["blade","gunner","lancer","duelist","shifter"], tactic:"swap"},
+ {name:"TEAM 05", units:["guard","scout","cannon","lancer","shifter"], tactic:"warp"}
+];
+let currentPreset=0;
+let inspectedChar="blade";
+let pendingTactic=null;
+let editorMode="units";
+let inspectedTactic=chosenTactic;
+let guideSettings={ally:"always",enemy:"command"};
+
+function syncActivePreset(){
+ team=[...teamPresets[currentPreset].units];
+ chosenTactic=teamPresets[currentPreset].tactic;
+}
+function renderTeam(){
+ syncActivePreset();
+ document.getElementById('presetIndexLabel').textContent=`TEAM ${String(currentPreset+1).padStart(2,'0')} / ${String(teamPresets.length).padStart(2,'0')}`;
+ document.getElementById('presetName').value=teamPresets[currentPreset].name;
+ document.getElementById('teamSlots').innerHTML=team.map((x,i)=>`<div class="slot filled" onclick="inspectChar('${x}')">${GAME_ASSETS[x]?.face?`<img class="teamSlotPortrait" src="${GAME_ASSETS[x].face}" alt="${CHARS[x].name}">`:''}${CHARS[x].name}<span style="position:absolute;right:4px;top:3px;color:#4f718a;font-size:7px">${i+1}</span></div>`).join('');
+ const t=TACTICS[chosenTactic], m=TACTIC_META[chosenTactic];
+ document.getElementById('teamTacticOrb').innerHTML=`<div><div class="orbIcon">${m.icon}</div><div class="orbName">${t.name}</div></div>`;
+ renderCharRows();
+ renderTacticRows();
+ renderEditorMode();
+}
+function renderCharRows(){
+ const rows=document.getElementById('charRows'); rows.innerHTML='';
+ Object.entries(CHARS).forEach(([id,c])=>{
+   const d=document.createElement('div');
+   d.className='charMini'+(id===inspectedChar?' active':'')+(team.includes(id)?' assigned':'');
+   const art=GAME_ASSETS[id]?.face;
+   d.innerHTML=`<div class="miniIcon ${art?'hasPortrait':''}">${art?`<img src="${art}" alt="${c.name}">`:(c.icon||c.glyph)}</div><div class="miniName">${c.name}</div><div class="role" style="text-align:center">${c.role}</div>`;
+   d.onclick=()=>inspectChar(id);
+   rows.appendChild(d);
+ });
+}
+function inspectChar(id){inspectedChar=id;editorMode="units";renderCharRows();renderEditorMode()}
+
+function setEditorMode(mode){
+ editorMode=mode;
+ if(mode==='tactics') inspectedTactic=teamPresets[currentPreset].tactic;
+ renderEditorMode();
+}
+function renderEditorMode(){
+ const units=editorMode==='units';
+ document.getElementById('tabUnits').classList.toggle('active',units);
+ document.getElementById('tabTactics').classList.toggle('active',!units);
+ document.getElementById('charRows').style.display=units?'grid':'none';
+ document.getElementById('tacticRows').style.display=units?'none':'grid';
+ document.getElementById('editorListTitle').textContent=units?'UNIT DATABASE // TAP TO INSPECT':'TACTIC DATABASE // TAP TO INSPECT';
+ if(units) renderTeamDetail(); else renderTacticInlineDetail();
+}
+function renderTacticRows(){
+ const rows=document.getElementById('tacticRows'); rows.innerHTML='';
+ Object.entries(TACTICS).forEach(([id,t])=>{
+  const d=document.createElement('div');
+  d.className='tacticMini'+(id===inspectedTactic?' active':'')+(teamPresets[currentPreset].tactic===id?' equipped':'');
+  d.innerHTML=`<div class="roundMini">${TACTIC_META[id].icon}</div><div class="miniName">${t.name}</div>`;
+  d.onclick=()=>{inspectedTactic=id;renderTacticRows();renderTacticInlineDetail()};
+  rows.appendChild(d);
+ });
+}
+function tacticDiagramHtml(id){
+ let cells=Array.from({length:36},()=> '');
+ const idx=(r,c)=>r*6+c;
+ if(id==='swap'){
+  cells[idx(2,1)]='src';cells[idx(3,4)]='dst';
+ }else if(id==='wall'){
+  cells[idx(2,3)]='wallCell';
+ }else if(id==='break'){
+  cells[idx(2,3)]='breakCell';
+ }else if(id==='lock'){
+  [[2,2],[2,3],[3,2],[3,3]].forEach(([r,c])=>cells[idx(r,c)]='lockCell');
+ }else if(id==='push'){
+  cells[idx(2,2)]='src';cells[idx(2,3)]='arrow';cells[idx(2,4)]='dst';
+ }else if(id==='warp'){
+  cells[idx(1,4)]='src';cells[idx(4,1)]='dst';
+ }else if(id==='shift'){
+  [0,1,2,3,4,5].forEach(c=>cells[idx(2,c)]='arrow');
+ }
+ return '<div class="tacticDiagram">'+cells.map(c=>`<span class="${c}"></span>`).join('')+'</div>';
+}
+function renderTacticInlineDetail(){
+ const id=inspectedTactic,t=TACTICS[id],m=TACTIC_META[id],equipped=teamPresets[currentPreset].tactic===id;
+ document.getElementById('teamDetail').innerHTML=`
+  <div class="detailHead">
+   <div><div class="detailTitle">${t.name}</div><div class="tags"><span class="tag">TACTIC</span><span class="tag">1 ACTION</span><span class="tag">ONCE / MATCH</span></div></div>
+   <div style="font-size:10px;color:#8f80c7">TACTICAL OVERRIDE</div>
+  </div>
+  <div class="detailBody">
+   <div class="bigPortrait" style="background:linear-gradient(145deg,#1c1733,#090b14 70%);font-size:52px">${m.icon}<span style="position:absolute;bottom:10px;left:12px;font-size:12px;letter-spacing:.12em;z-index:2">${t.name}</span></div>
+   <div>
+    <div class="rangeBox"><div class="rangeTitle">EFFECT DIAGRAM</div>${tacticDiagramHtml(id)}</div>
+    <div class="explainBox"><div class="explainName">EFFECT</div><div class="explainText">${m.detail}</div></div>
+    <div class="teamAction"><button class="smallbtn ${equipped?'':'primary'}" onclick="equipInlineTactic('${id}')">${equipped?'EQUIPPED':'EQUIP TACTIC'}</button></div>
+   </div>
+  </div>`;
+}
+function equipInlineTactic(id){
+ teamPresets[currentPreset].tactic=id;
+ chosenTactic=id;
+ inspectedTactic=id;
+ renderTeam();
+ editorMode='tactics';
+ renderEditorMode();
+}
+
+function rangeHtml(id,kind){
+ const c=CHARS[id],size=7,center=3,on=new Set(),key=(r,c)=>`${r},${c}`;
+ if(kind==='move'){
+  if(c.move==='king')for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)if(dr||dc)on.add(key(center+dr,center+dc));
+  if(c.move==='orth1')[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>on.add(key(center+dr,center+dc)));
+  if(c.move==='diag1')[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc])=>on.add(key(center+dr,center+dc)));
+  if(c.move==='orth2')[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>{on.add(key(center+dr,center+dc));on.add(key(center+dr*2,center+dc*2))});
+ } else {
+  if(c.attack==='king')for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)if(dr||dc)on.add(key(center+dr,center+dc));
+  if(c.attack==='orth1')[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>on.add(key(center+dr,center+dc)));
+  if(c.attack==='orth2')[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>{on.add(key(center+dr,center+dc));on.add(key(center+dr*2,center+dc*2))});
+  if(c.attack==='orth2exact')[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>on.add(key(center+dr*2,center+dc*2)));
+  if(c.attack==='diag1')[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc])=>on.add(key(center+dr,center+dc)));
+ }
+ let s='<div class="rangeGrid">';
+ for(let r=0;r<size;r++)for(let col=0;col<size;col++){
+   let cls=(r===center&&col===center)?'self':(on.has(key(r,col))?(kind==='move'?'moveOn':'atkOn'):'');
+   s+=`<span class="${cls}"></span>`;
+ }
+ return s+'</div>';
+}
+function renderTeamDetail(){
+ const id=inspectedChar,c=CHARS[id],m=CHAR_META[id];
+ const assigned=team.includes(id);
+ document.getElementById('teamDetail').innerHTML=`
+  <div class="detailHead">
+   <div><div class="detailTitle">${GAME_ASSETS[id]?.symbol?`<img class="classSymbolMini" src="${GAME_ASSETS[id].symbol}" alt="">`:''}${c.name}</div><div class="role">${c.role}</div><div class="tags">${m.tags.map(x=>`<span class="tag">${x}</span>`).join('')}</div></div>
+   <div style="font-size:10px;color:#6f8aa0">UNIT DATABASE</div>
+  </div>
+  <div class="detailBody">
+   <div class="bigPortrait ${GAME_ASSETS[id]?.face?'hasAsset':''}">${GAME_ASSETS[id]?.face?`<img src="${GAME_ASSETS[id].face}" alt="${c.name}">`:(c.icon||c.glyph)}<span style="position:absolute;bottom:10px;left:12px;font-size:12px;letter-spacing:.12em;z-index:2">${c.name}</span></div>
+   <div>
+    <div class="statCols">
+     <div class="rangeBox"><div class="rangeTitle">MOVE</div>${rangeHtml(id,'move')}</div>
+     <div class="rangeBox"><div class="rangeTitle">ATTACK</div>${rangeHtml(id,'attack')}</div>
+    </div>
+    <div class="explainBox"><div class="explainName">STANCE // ${c.stance}</div><div class="explainText">${m.stanceDesc}</div></div>
+    <div class="explainBox"><div class="explainName">UNIT NOTES</div><div class="explainText">${m.desc}</div></div>
+    <div class="teamAction"><button class="smallbtn ${assigned?'':'primary'}" onclick="toggleChar('${id}')">${assigned?'REMOVE':'ADD TO TEAM'}</button></div>
+   </div>
+  </div>`;
+}
+function toggleChar(id){
+ const p=teamPresets[currentPreset];
+ if(p.units.includes(id)){
+   p.units=p.units.filter(x=>x!==id);
+ }else{
+   if(p.units.length>=5)return;
+   p.units.push(id);
+ }
+ syncActivePreset();renderTeam();
+}
+function changePreset(dir){
+ currentPreset=(currentPreset+dir+teamPresets.length)%teamPresets.length;
+ inspectedChar=teamPresets[currentPreset].units[0]||"blade"; inspectedTactic=teamPresets[currentPreset].tactic;
+ renderTeam();
+}
+function renamePreset(v){teamPresets[currentPreset].name=(v.trim()||`TEAM ${String(currentPreset+1).padStart(2,'0')}`)}
+function saveTeam(){show('title')}
+function startCpuFlow(){syncActivePreset();if(team.length!==5){show('team');return}beginSetup()}
+function enemyTeam(){let ids=Object.keys(CHARS).filter(x=>!team.includes(x));let pool=[...team,...ids].sort(()=>Math.random()-.5);return pool.slice(0,5)}
+let eTeam=[];
+function beginSetup(){
+ eTeam=enemyTeam();setupPlacements={};setupSel=null;
+ show('setup');renderSetup();
+}
+function renderSetup(){
+ document.getElementById('setupEnemy').innerHTML=eTeam.map(x=>enemyBadge(x,false)).join('');
+ document.getElementById('setupUnits').innerHTML=team.map(id=>{
+  const portrait=hasGameFace(id)
+   ? gameFaceImg(id,'setupFace','style="width:100%;height:100%;object-fit:cover;border-radius:8px;display:block"')
+   : (CHARS[id].icon||CHARS[id].glyph);
+  return `<div class="card ${Object.values(setupPlacements).includes(id)?'dim':''}" onclick="selectSetupUnit('${id}')"><div class="portrait setupPortrait" style="position:relative;font-size:24px">${portrait}<span style="position:absolute;right:6px;bottom:4px;font-size:9px;color:#8fb7d5;z-index:4">${CHARS[id].glyph}</span></div><div class="name">${CHARS[id].name}</div></div>`;
+ }).join('');
+ let b=document.getElementById('setupBoard');b.innerHTML='';
+ for(let r=0;r<6;r++)for(let c=0;c<6;c++){
+  let cell=document.createElement('div');cell.className='cell '+(r<2?'enemyZone':r>3?'playerZone':'');
+  let key=r+','+c,uid=setupPlacements[key];
+  if(uid)cell.innerHTML=unitHtml(uid,false,false,false);
+  if(r>3)cell.onclick=()=>placeSetup(r,c);
+  b.appendChild(cell);
+ }
+ let n=Object.keys(setupPlacements).length;document.getElementById('setupCount').textContent=n+" / 4";
+ document.getElementById('readyBtn').classList.toggle('disabled',n!==4)
+}
+function selectSetupUnit(id){if(Object.values(setupPlacements).includes(id)){for(const k in setupPlacements)if(setupPlacements[k]===id)delete setupPlacements[k];setupSel=id}else setupSel=id;renderSetup()}
+function placeSetup(r,c){if(!setupSel)return;let key=r+','+c;for(const k in setupPlacements)if(setupPlacements[k]===setupSel)delete setupPlacements[k];if(setupPlacements[key])return;setupPlacements[key]=setupSel;setupSel=null;renderSetup()}
+function lockSetup(){
+ if(Object.keys(setupPlacements).length!==4)return;
+ enemySetup={};let chosen=[...eTeam].sort(()=>Math.random()-.5).slice(0,4);
+ let spots=[];for(let r=0;r<2;r++)for(let c=0;c<6;c++)spots.push([r,c]);spots.sort(()=>Math.random()-.5);
+ chosen.forEach((id,i)=>enemySetup[spots[i][0]+','+spots[i][1]]=id);
+ showReveal();
+}
+function showReveal(){
+ show('battle');initBattle();
+ overlay(`<div class="small">ENEMY DEPLOYMENT ACQUIRED</div><div class="big">REVEAL</div><p class="note" style="text-align:center">配置を確認しています…</p>`);
+ setTimeout(()=>coinToss(),2200);
+}
+function coinToss(){
+ overlay(`<div class="small">INITIATIVE</div><div class="coin">?</div><div class="small">CALCULATING...</div>`);
+ setTimeout(()=>{let player=Math.random()<.5;battle.turn=player?'player':'enemy';battle.ap=2;overlay(`<div class="small">INITIATIVE RESULT</div><div class="big">${player?'YOU FIRST':'ENEMY FIRST'}</div>`);setTimeout(()=>{closeOverlay();renderBattle();if(!player)setTimeout(cpuTurn,600)},900)},1000);
+}
+function initBattle(){
+ let units=[],idn=1;
+ for(const [k,id] of Object.entries(setupPlacements)){let [r,c]=k.split(',').map(Number);units.push(makeUnit('p'+idn++,id,'player',r,c))}
+ for(const [k,id] of Object.entries(enemySetup)){let [r,c]=k.split(',').map(Number);units.push(makeUnit('e'+idn++,id,'enemy',r,c))}
+ let pReserve=team.find(x=>!Object.values(setupPlacements).includes(x));
+ let eReserve=eTeam.find(x=>!Object.values(enemySetup).includes(x));
+ battle={units,terrain:{},locks:[],turn:'player',ap:2,selected:null,cmd:null,pReserve,eReserve,pTactic:chosenTactic,eTactic:Object.keys(TACTICS)[Math.floor(Math.random()*Object.keys(TACTICS).length)],pTacticUsed:false,eTacticUsed:false,stanceSeq:0,round:1,winner:null};
+ renderBattle();
+}
+function makeUnit(uid,type,side,r,c){return{uid,type,side,r,c,alive:true,stance:null,stanceOrder:0,deploySick:false,attacked:false,charged:false,linkTarget:null,shifterReady:null}}
+function unitHtml(type,enemy=false,selected=false,stance=false,charged=false,sick=false){
+ let c=CHARS[type],art=(GAME_ASSETS[type]&&GAME_ASSETS[type].unit)?GAME_ASSETS[type].unit:null;
+ return `<div class="unit ${enemy?'enemy':''} ${selected?'selected':''} ${stance?'stance':''} ${charged?'charged':''} ${sick?'deploySick':''} ${art?'hasArt':''}">
+ <span class="unitAccent"></span>${art?`<img class="unitArt" src="${art}" alt="${c.name}">`:''}<span class="unitFace"></span><span class="unitRole">${c.icon||c.glyph}</span><span class="unitCode">${c.name}</span></div>`
+}
+function enemyBadge(id,dead,reserve=false){
+ let art=GAME_ASSETS[id]?.face;
+ return `<div class="enemyIcon ${dead?'dead':''} ${reserve?'reserve':''}" onpointerdown="holdDetail(event,'${id}')">${art?`<img class="enemyPortrait" src="${art}" alt="${CHARS[id].name}">`:CHARS[id].glyph+'<br>'}<span>${CHARS[id].name.slice(0,4)}</span></div>`
+}
+
+function stanceIcon(u){
+ if(!u||!u.stance)return '';
+ const icons={blade:'✦',gunner:'⌖',guard:'◆',scout:'↘',duelist:'⚔',cannon:'◉',lancer:'➤',shifter:'⇄'};
+ return icons[u.type]||'•';
+}
+function activeStanceArea(u){
+ let out=[];
+ if(!u||!u.alive||!u.stance)return out;
+ if(u.type==='blade'){
+  for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)if(dr||dc){
+   let r=u.r+dr,c=u.c+dc;if(inside(r,c))out.push([r,c,'intercept']);
+  }
+ }
+ if(u.type==='gunner'){
+  for(const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+   for(let s=1;s<=3;s++){
+    let r=u.r+dr*s,c=u.c+dc*s;
+    if(!inside(r,c))break;
+    if(battle.terrain[r+','+c]==='wall')break;
+    out.push([r,c,'intercept']);
+    if(unitAt(r,c))break;
+   }
+  }
+ }
+ if(u.type==='guard'){
+  for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)if(dr||dc){
+   let r=u.r+dr,c=u.c+dc;if(inside(r,c))out.push([r,c,'guard']);
+  }
+ }
+ return out;
+}
+function shouldShowEnemyMoveGuide(){
+ if(guideSettings.enemy==='off')return false;
+ if(guideSettings.enemy==='always')return true;
+ return battle&&battle.cmd==='move';
+}
+function shouldShowEnemyAttackGuide(){
+ if(guideSettings.enemy==='off')return false;
+ if(guideSettings.enemy==='always')return true;
+ return battle&&battle.cmd==='attack';
+}
+function buildGuideMaps(){
+ let ally=new Map(),enemy=new Map();
+ if(!battle)return{ally,enemy};
+ if(guideSettings.ally==='always'&&battle.turn==='player'){
+  battle.units.filter(u=>u.alive&&u.side==='player'&&u.stance).forEach(u=>{
+   activeStanceArea(u).forEach(([r,c,t])=>ally.set(r+','+c,t));
+  });
+ }
+ if(shouldShowEnemyMoveGuide()){
+  battle.units.filter(u=>u.alive&&u.side==='enemy'&&u.stance&&(u.type==='blade'||u.type==='gunner')).forEach(u=>{
+   activeStanceArea(u).forEach(([r,c,t])=>enemy.set(r+','+c,t));
+  });
+ }
+ return{ally,enemy};
+}
+function attackReactionInfo(target,attacker){
+ let info={evade:null,counter:false,guard:null};
+ if(!target||!attacker)return info;
+ if(target.type==='scout'&&target.stance){
+  let dr=Math.sign(target.r-attacker.r),dc=Math.sign(target.c-attacker.c);
+  let rr=target.r+dr,cc=target.c+dc;
+  if(inside(rr,cc)&&!blocked(rr,cc,target.side))info.evade=[rr,cc];
+ }
+ if(target.type==='duelist'&&target.stance&&Math.max(Math.abs(target.r-attacker.r),Math.abs(target.c-attacker.c))===1){
+  info.counter=true;
+ }
+ let g=battle.units.find(u=>u.alive&&u.side===target.side&&u.type==='guard'&&u.stance&&Math.max(Math.abs(u.r-target.r),Math.abs(u.c-target.c))===1);
+ if(g)info.guard=g.uid;
+ return info;
+}
+
+function renderBattle(){
+ if(!battle)return;
+ document.getElementById('enemyTeamHud').innerHTML=eTeam.map(id=>{
+  let alive=battle.units.some(u=>u.side==='enemy'&&u.type===id&&u.alive) || battle.eReserve===id;
+  return enemyBadge(id,!alive,battle.eReserve===id)
+ }).join('');
+ document.getElementById('enemyTacticHud').innerHTML=battle.eTacticUsed?`${TACTIC_META[battle.eTactic]?.icon||'◎'} ${TACTICS[battle.eTactic].name}`:'?';
+ document.getElementById('turnStatus').textContent=(battle.turn==='player'?'YOUR TURN':'ENEMY TURN')+' // ROUND '+battle.round;
+ let b=document.getElementById('battleBoard');b.innerHTML='';
+ let targets=computeHighlights();
+ let guides=buildGuideMaps();
+ let attacker=getUnit(battle.selected);
+
+ for(let r=0;r<6;r++)for(let c=0;c<6;c++){
+  let cell=document.createElement('div');cell.className='cell '+(r<2?'enemyZone':r>3?'playerZone':'');
+  let key=r+','+c,ter=battle.terrain[key];if(ter)cell.classList.add(ter);
+  if(isLockedCell(r,c,battle.turn==='player'?'player':'enemy'))cell.classList.add('locked');
+  if(targets.move?.has(key))cell.classList.add('move');
+  if(targets.attack?.has(key))cell.classList.add('attack');
+  if(targets.deploy?.has(key))cell.classList.add('deploy');
+  if(targets.tactic?.has(key))cell.classList.add('tacticTarget');
+
+  if(guides.ally.has(key)){
+   let z=document.createElement('div');z.className='guideZone ally'+(guides.ally.get(key)==='guard'?' guard':'');cell.appendChild(z);
+  }
+  if(guides.enemy.has(key)){
+   let z=document.createElement('div');z.className='guideZone '+(battle.cmd==='move'?'enemyStrong':'enemy');cell.appendChild(z);
+  }
+
+  if(battle.cmd==='tactic:warp'&&tacticState.source){
+   let src=getUnit(tacticState.source);
+   if(src&&src.r===r&&src.c===c){
+    let ring=document.createElement('div');ring.className='tacticSourceRing';cell.appendChild(ring);
+   }else if(r>=4&&r<6&&!blocked(r,c,'player')){
+    let wd=document.createElement('div');wd.className='warpDest';cell.appendChild(wd);
+   }
+  }
+
+  if(battle.cmd==='tactic:push'&&tacticState.source){
+   let src=getUnit(tacticState.source);
+   if(src&&src.r===r&&src.c===c){
+    let ring=document.createElement('div');ring.className='pushSource';cell.appendChild(ring);
+   }else if(src&&Math.abs(r-src.r)+Math.abs(c-src.c)===1&&!blocked(r,c,src.side)){
+    let pd=document.createElement('div');pd.className='pushDest';cell.appendChild(pd);
+   }
+  }
+
+  if(battle.cmd==='tactic:shift'&&tacticState.shiftCell){
+   let sc=tacticState.shiftCell;
+   if(r===sc.r){let l=document.createElement('div');l.className='shiftCrossRow';cell.appendChild(l)}
+   if(c===sc.c){let l=document.createElement('div');l.className='shiftCrossCol';cell.appendChild(l)}
+   if(r===sc.r&&c===sc.c){let l=document.createElement('div');l.className='shiftSelected';cell.appendChild(l)}
+  }
+
+  if(battle.cmd==='tactic:lock'&&tacticState.lockAnchor){
+   let a=tacticState.lockAnchor;
+   if(r>=a.r&&r<=a.r+1&&c>=a.c&&c<=a.c+1){
+    let lp=document.createElement('div');lp.className='lockPreview';cell.appendChild(lp);
+   }
+   if(r===a.r&&c===a.c){
+    let la=document.createElement('div');la.className='lockAnchor';cell.appendChild(la);
+   }
+  }
+
+  let u=unitAt(r,c);
+  if(u){
+   cell.insertAdjacentHTML('beforeend',unitHtml(u.type,u.side==='enemy',battle.selected===u.uid,!!u.stance,u.charged,u.deploySick));
+   if(u.stance){
+    let sm=document.createElement('div');sm.className='stanceMark';sm.textContent=stanceIcon(u);cell.appendChild(sm);
+   }
+
+   if(battle.cmd==='attack'&&attacker&&u.side==='enemy'&&targets.attack?.has(key)&&shouldShowEnemyAttackGuide()){
+    let ri=attackReactionInfo(u,attacker);
+    if(ri.evade){
+     let badge=document.createElement('div');badge.className='reactionBadge evade';badge.textContent='↘';cell.appendChild(badge);
+     let [er,ec]=ri.evade;
+     let angle=Math.atan2(er-r,ec-c)*180/Math.PI;
+     let line=document.createElement('div');line.className='escapeLine';line.style.transform=`rotate(${angle}deg)`;cell.appendChild(line);
+    }else if(ri.counter){
+     let badge=document.createElement('div');badge.className='reactionBadge counter';badge.textContent='⚔';cell.appendChild(badge);
+    }else if(ri.guard){
+     let badge=document.createElement('div');badge.className='reactionBadge guard';badge.textContent='◆';cell.appendChild(badge);
+    }
+   }
+  }
+
+  cell.onclick=()=>boardClick(r,c);
+  cell.onpointerdown=e=>{if(u)holdDetail(e,u.type)};
+  b.appendChild(cell);
+ }
+ renderHud();
+}
+function renderHud(){
+ document.getElementById('apPips').innerHTML=[0,1].map(i=>`<div class="pip ${i<battle.ap?'on':''}"></div>`).join('');
+ let sel=getUnit(battle.selected), playerTurn=battle.turn==='player';
+ document.getElementById('selectionStatus').textContent=
+ (battle.cmd==='tactic:warp'&&!tacticState.source)?'WARP // SELECT UNIT':
+ (battle.cmd==='tactic:warp'&&tacticState.source)?'WARP // SELECT DESTINATION':
+ (battle.cmd==='tactic:push'&&!tacticState.source)?'PUSH // SELECT UNIT':
+ (battle.cmd==='tactic:push'&&tacticState.source)?'PUSH // SELECT DIRECTION':
+ (battle.cmd==='tactic:shift'&&!tacticState.shiftCell)?'SHIFT // SELECT LINE':
+ (battle.cmd==='tactic:shift'&&tacticState.shiftCell)?'SHIFT // SELECT DIRECTION':
+ (battle.cmd==='tactic:lock'&&!tacticState.lockAnchor)?'LOCK // SELECT 2×2 AREA':
+ (battle.cmd==='tactic:lock'&&tacticState.lockAnchor)?'LOCK // TAP AGAIN TO CONFIRM':
+ (sel?`${CHARS[sel.type].name} SELECTED`:(playerTurn?'SELECT UNIT':'WAITING...'));
+ ['Move','Attack','Stance'].forEach(n=>document.getElementById('cmd'+n).className='cmd'+(playerTurn&&sel&&battle.ap>0?' enabled':''));
+ document.getElementById('cmdDeploy').className='cmd'+(playerTurn&&battle.ap>0&&battle.pReserve?' enabled':'');
+ document.getElementById('cmdPass').className='cmd'+(playerTurn?' enabled':'');
+ const tb=document.getElementById('cmdTactic');
+ tb.className='cmd tactic'+(playerTurn&&battle.ap>0&&!battle.pTacticUsed?' enabled':'');
+ const tid=battle.pTactic, ti=TACTIC_META[tid]?.icon||'◎';
+ tb.setAttribute('data-icon',ti);
+ tb.innerHTML=`<span style="font-size:18px;line-height:1">${ti}</span><br><span style="font-size:8px">${TACTICS[tid].name}</span>`;
+ const sc=document.getElementById('shiftControls');
+ if(sc)sc.classList.toggle('active',battle.cmd==='tactic:shift'&&!!tacticState.shiftCell);
+}
+function getUnit(uid){return battle.units.find(u=>u.uid===uid&&u.alive)}
+function unitAt(r,c){return battle.units.find(u=>u.alive&&u.r===r&&u.c===c)}
+function boardClick(r,c){
+ if(cutinBusy)return;
+ if(!battle||battle.turn!=='player'||battle.winner)return;
+ let u=unitAt(r,c);
+
+ // Normal unit selection can be changed at any time unless a TACTIC is currently choosing targets.
+ if(!battle.cmd || !battle.cmd.startsWith('tactic')){
+  if(u&&u.side==='player'){
+   if(battle.selected===u.uid){
+    battle.selected=null;
+    battle.cmd=null;
+   }else{
+    battle.selected=u.uid;
+    battle.cmd=null;
+   }
+   renderBattle();
+   return;
+  }
+ }
+
+ if(!battle.cmd)return;
+ if(battle.cmd==='move')tryMove(r,c);
+ else if(battle.cmd==='attack')tryAttack(r,c);
+ else if(battle.cmd==='deploy')tryDeploy(r,c);
+ else if(battle.cmd.startsWith('tactic'))tacticClick(r,c);
+}
+function setCommand(cmd){if(cutinBusy)return;
+ if(battle.turn!=='player'||battle.ap<=0)return;
+ if(cmd==='deploy'){if(!battle.pReserve)return;battle.selected=null;battle.cmd='deploy';renderBattle();return}
+ if(!getUnit(battle.selected))return;
+ battle.cmd=cmd;renderBattle();
+}
+function spend(){
+ battle.ap--;
+ battle.cmd=null;
+ clearTurnFlagsIfNeeded();
+ renderBattle();
+ // Player actions may auto-end at 0 AP.
+ // CPU actions are advanced/ended only by cpuTurn() to prevent duplicate endTurn calls.
+ if(battle.ap<=0&&!battle.winner&&battle.turn==='player')setTimeout(endTurn,450);
+}
+function clearTurnFlagsIfNeeded(){}
+function movementCells(u){
+ let arr=[];let dirs=[];
+ if(CHARS[u.type].move==='king')dirs=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+ if(CHARS[u.type].move==='orth1')dirs=[[-1,0],[1,0],[0,-1],[0,1]];
+ if(CHARS[u.type].move==='diag1')dirs=[[-1,-1],[-1,1],[1,-1],[1,1]];
+ if(CHARS[u.type].move==='orth2'){
+  [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc])=>{for(let s=1;s<=2;s++){let r=u.r+dr*s,c=u.c+dc*s;if(!inside(r,c)||blocked(r,c,u.side))break;arr.push([r,c])}});return arr;
+ }
+ dirs.forEach(([dr,dc])=>{let r=u.r+dr,c=u.c+dc;if(inside(r,c)&&!blocked(r,c,u.side))arr.push([r,c])});
+ return arr;
+}
+function attackCells(u,forStance=false){
+ let a=[],t=CHARS[u.type].attack;
+ if(u.type==='cannon'&&u.charged){
+  // Charged cannon has a 2-square dead zone.
+  for(let r=0;r<6;r++)for(let c=0;c<6;c++){
+   let d=Math.max(Math.abs(r-u.r),Math.abs(c-u.c));
+   if(d>=3&&d<=4)a.push([r,c]);
+  }
+  return a;
+ }
+ let rays=(max,exact=false)=>{for(const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]])for(let s=1;s<=max;s++){let r=u.r+dr*s,c=u.c+dc*s;if(!inside(r,c))break;if(exact&&s!==max)continue;a.push([r,c]);if(unitAt(r,c)||battle.terrain[r+','+c]==='wall')break}};
+ if(t==='king')for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)if(dr||dc){let r=u.r+dr,c=u.c+dc;if(inside(r,c))a.push([r,c])}
+ if(t==='orth1')rays(1);
+ if(t==='orth2')rays(u.type==='gunner'&&forStance?3:2);
+ if(t==='orth2exact')rays(u.stance?3:2,true);
+ if(t==='diag1')for(const [dr,dc] of [[-1,-1],[-1,1],[1,-1],[1,1]]){let r=u.r+dr,c=u.c+dc;if(inside(r,c))a.push([r,c])}
+ return a;
+}
+function blocked(r,c,side){
+ if(unitAt(r,c))return true;
+ let t=battle.terrain[r+','+c];if(t==='wall'||t==='break')return true;
+ if(isLockedCell(r,c,side))return true;
+ return false;
+}
+function isLockedCell(r,c,side){
+ return battle.locks.some(L=>L.side===side&&L.turns>0&&r>=L.r&&r<L.r+2&&c>=L.c&&c<L.c+2)
+}
+function tryMove(r,c){
+ let u=getUnit(battle.selected);if(!u)return;
+ if(!movementCells(u).some(x=>x[0]===r&&x[1]===c))return;
+
+ let from=[u.r,u.c], dr=r-u.r, dc=c-u.c;
+
+ // SHIFTER: if it was armed on the previous turn, remember every allied
+ // unit adjacent to its OLD square. After SHIFTER moves, each of them
+ // independently attempts to move one square in the same direction.
+ let formation=[];
+ let formationActive=(u.type==='shifter'&&u.shifterReady==='ready');
+ if(formationActive){
+   formation=battle.units.filter(a=>
+     a.alive && a.side===u.side && a.uid!==u.uid &&
+     Math.max(Math.abs(a.r-u.r),Math.abs(a.c-u.c))===1
+   );
+ }
+
+ u.r=r;u.c=c;u.stance=null;u.charged=false;u.linkTarget=null;
+ if(u.type==='shifter')u.shifterReady=null;
+ resolveEntry(u,from);
+ if(!u.alive){postAction();return}
+
+ if(formationActive && formation.length){
+   // Calculate all desired destinations from the pre-move position.
+   const desired=new Map();
+   formation.forEach(a=>desired.set(a.uid,[a.r+dr,a.c+dc]));
+
+   // Units whose destination is outside / terrain-blocked cannot move.
+   const movable=new Set(formation.map(a=>a.uid));
+   let changed=true;
+   while(changed){
+     changed=false;
+     for(const a of formation){
+       if(!movable.has(a.uid))continue;
+       const [nr,nc]=desired.get(a.uid);
+       const ter=inside(nr,nc)?battle.terrain[nr+','+nc]:null;
+       if(!inside(nr,nc)||ter==='wall'||ter==='break'||isLockedCell(nr,nc,a.side)){
+         movable.delete(a.uid);changed=true;continue;
+       }
+       const occ=unitAt(nr,nc);
+       // SHIFTER's old square is now empty, and another formation unit may
+       // vacate its square simultaneously. Any other remaining occupant blocks.
+       if(occ && occ.uid!==u.uid && !movable.has(occ.uid)){
+         movable.delete(a.uid);changed=true;
+       }
+     }
+   }
+
+   // Apply successful moves simultaneously, then resolve entry reactions
+   // in stable board order for deterministic behavior.
+   const moved=[];
+   formation
+     .filter(a=>movable.has(a.uid))
+     .sort((a,b)=>(a.r*6+a.c)-(b.r*6+b.c))
+     .forEach(a=>{
+       const old=[a.r,a.c], [nr,nc]=desired.get(a.uid);
+       a.r=nr;a.c=nc;
+       a.stance=null;a.charged=false;a.linkTarget=null;
+       if(a.type==='shifter')a.shifterReady=null;
+       moved.push([a,old]);
+     });
+   for(const [a,old] of moved){
+     if(a.alive)resolveEntry(a,old);
+   }
+ }
+
+ spend();
+}
+let cutinBusy=false;
+function playBattleCutin(type){
+ if(type!=='blade')return Promise.resolve();
+ const cutin=document.getElementById('battleCutin');
+ const back=document.getElementById('battleCutinBackdrop');
+ if(!cutin||!back)return Promise.resolve();
+ cutinBusy=true;
+ cutin.classList.remove('show');back.classList.remove('show');
+ void cutin.offsetWidth;
+ cutin.classList.add('show');back.classList.add('show');
+ return new Promise(resolve=>{
+  setTimeout(()=>{
+   cutin.classList.remove('show');back.classList.remove('show');
+   cutinBusy=false;resolve();
+  },720);
+ });
+}
+
+function resolveEntry(mover,from){
+ let reactors=battle.units.filter(x=>x.alive&&x.side!==mover.side&&x.stance&&['blade','gunner'].includes(x.type))
+ .filter(x=>attackCells(x,true).some(p=>p[0]===mover.r&&p[1]===mover.c)&&!attackCells(x,true).some(p=>p[0]===from[0]&&p[1]===from[1]))
+ .sort((a,b)=>a.stanceOrder-b.stanceOrder);
+ if(reactors.length){
+  let r=reactors[0];
+  r.stance=null;r.linkTarget=null;
+  if(r.type==='blade'){
+   playBattleCutin('blade').then(()=>{
+    if(mover.alive)killUnit(mover);
+    if(battle)renderBattle();
+   });
+  }else{
+   killUnit(mover);
+  }
+ }
+}
+function tryAttack(r,c){
+ let u=getUnit(battle.selected),target=unitAt(r,c);if(!u||!target||target.side===u.side||u.attacked||u.deploySick)return;
+ let cells=attackCells(u);if(!cells.some(x=>x[0]===r&&x[1]===c))return;
+ // lancer extended stance: if target distance 3 orthogonal, auto-step 1 before attack
+ if(u.type==='lancer'&&u.stance){
+  let dr=Math.sign(r-u.r),dc=Math.sign(c-u.c),dist=Math.abs(r-u.r)+Math.abs(c-u.c);
+  if(dist===3){
+   let nr=u.r+dr,nc=u.c+dc;
+   if(blocked(nr,nc,u.side))return;
+   let from=[u.r,u.c];u.r=nr;u.c=nc;u.stance=null;resolveEntry(u,from);if(!u.alive){spend();return}
+  }
+ }
+ // scout retreat
+ if(target.stance&&target.type==='scout'){
+  let dr=Math.sign(target.r-u.r),dc=Math.sign(target.c-u.c),nr=target.r+dr,nc=target.c+dc;
+  target.stance=null;target.linkTarget=null;
+  if(inside(nr,nc)&&!blocked(nr,nc,target.side)){let from=[target.r,target.c];target.r=nr;target.c=nc;resolveEntry(target,from);u.attacked=true;spend();return}
+ }
+ // duelist counter for adjacent attack
+ if(target.stance&&target.type==='duelist'&&Math.max(Math.abs(target.r-u.r),Math.abs(target.c-u.c))===1){
+  target.stance=null;target.linkTarget=null;killUnit(u);if(!u.alive){spend();return}
+ }
+ // guard cover
+ let guard=battle.units.filter(x=>x.alive&&x.side===target.side&&x.type==='guard'&&x.stance&&Math.max(Math.abs(x.r-target.r),Math.abs(x.c-target.c))===1).sort((a,b)=>a.stanceOrder-b.stanceOrder)[0];
+ if(guard){guard.stance=null;guard.linkTarget=null;killUnit(guard)} else killUnit(target);
+ u.attacked=true;u.stance=null;
+ if(u.type==='cannon')u.charged=false;
+ spend();
+}
+function doStance(){if(cutinBusy)return;
+ let u=getUnit(battle.selected);if(!u||battle.turn!=='player'||battle.ap<=0||u.deploySick||u.attacked)return;
+ battle.stanceSeq++;
+ u.stance=CHARS[u.type].stance;
+ u.stanceOrder=battle.stanceSeq;
+ if(u.type==='cannon')u.charged=true;
+ if(u.type==='shifter')u.shifterReady='waiting';
+ spend();
+}
+function tryDeploy(r,c){
+ if(!battle.pReserve||battle.ap<=0||r<4||unitAt(r,c)||battle.terrain[r+','+c]||isLockedCell(r,c,'player'))return;
+ let u=makeUnit('pd'+Date.now(),battle.pReserve,'player',r,c);u.deploySick=true;battle.units.push(u);battle.pReserve=null;battle.selected=u.uid;spend();
+}
+function startTactic(){if(cutinBusy)return;
+ if(battle.turn!=='player'||battle.ap<=0||battle.pTacticUsed)return;
+ tacticState={};
+ battle.cmd='tactic:'+battle.pTactic;battle.selected=null;renderBattle();
+}
+let tacticState={};
+function tacticClick(r,c){
+ let id=battle.cmd.split(':')[1],u=unitAt(r,c),key=r+','+c;
+ if(id==='wall'||id==='break'){
+  if(u||battle.terrain[key])return;
+  if(!confirm('TACTIC '+TACTICS[id].name+' を使用しますか？'))return;
+  battle.terrain[key]=id;battle.pTacticUsed=true;spend();return;
+ }
+ if(id==='warp'){
+  if(!tacticState.source){
+   if(!u||u.side!=='player')return;
+   tacticState.source=u.uid;
+   renderBattle();
+   return;
+  }
+  let s=getUnit(tacticState.source);
+  if(u&&u.uid===s.uid){
+   tacticState.source=null;
+   renderBattle();
+   return;
+  }
+  if(r<4||blocked(r,c,'player'))return;
+  if(!confirm('WARPを実行しますか？'))return;
+  s.r=r;s.c=c;s.stance=null;s.charged=false;s.linkTarget=null;s.shifterReady=null;
+  battle.pTacticUsed=true;tacticState={};spend();return;
+ }
+ if(id==='push'){
+  if(!tacticState.source){
+   if(!u)return;
+   tacticState.source=u.uid;
+   renderBattle();
+   return;
+  }
+  let s=getUnit(tacticState.source);
+  if(u&&u.uid===s.uid){
+   tacticState.source=null;
+   renderBattle();
+   return;
+  }
+  if(Math.abs(r-s.r)+Math.abs(c-s.c)!==1||blocked(r,c,s.side))return;
+  if(!confirm('PUSHを実行しますか？'))return;
+  s.r=r;s.c=c;s.stance=null;s.charged=false;s.linkTarget=null;s.shifterReady=null;
+  battle.pTacticUsed=true;tacticState={};spend();return;
+ }
+ if(id==='swap'){
+  if(!tacticState.source){if(!u||u.side!=='player')return;tacticState.source=u.uid;renderBattle();return}
+  let a=getUnit(tacticState.source);if(!u||u.side!=='player'||u.uid===a.uid)return;if(!confirm('SWAPを実行しますか？'))return;
+  [a.r,u.r]=[u.r,a.r];[a.c,u.c]=[u.c,a.c];a.stance=u.stance=null;a.charged=u.charged=false;battle.pTacticUsed=true;tacticState={};spend();return;
+ }
+ if(id==='lock'){
+  if(r>4||c>4)return;
+  if(!tacticState.lockAnchor || tacticState.lockAnchor.r!==r || tacticState.lockAnchor.c!==c){
+   tacticState.lockAnchor={r,c};
+   renderBattle();
+   return;
+  }
+  if(!confirm('LOCKを実行しますか？'))return;
+  battle.locks.push({r,c,side:'enemy',turns:2});
+  battle.pTacticUsed=true;tacticState={};spend();return;
+ }
+ if(id==='shift'){
+  tacticState.shiftCell={r,c};
+  renderBattle();
+  return;
+ }
+}
+function confirmShiftDir(kind,dir){
+ if(!tacticState.shiftCell)return;
+ let index=(kind==='row'?tacticState.shiftCell.r:tacticState.shiftCell.c);
+ if(!confirm('SHIFTを実行しますか？'))return;
+ applyShift(kind,index,dir);
+}
+function applyShift(kind,index,dir){
+ // Characters + WALLs on the selected line attempt a simultaneous cyclic shift.
+ // BREAK never moves and blocks movement. Moving WALL origins are treated as
+ // temporarily empty during validation so a train of units/walls can shift together.
+ let chars=battle.units.filter(u=>u.alive&&(kind==='row'?u.r===index:u.c===index));
+ let walls=[];
+ for(let i=0;i<6;i++){
+  let r=kind==='row'?index:i,c=kind==='row'?i:index;
+  if(battle.terrain[r+','+c]==='wall')walls.push({id:'w:'+r+','+c,r,c,type:'wall'});
+ }
+
+ let objs=[
+  ...chars.map(u=>({id:'u:'+u.uid,r:u.r,c:u.c,type:'unit',u})),
+  ...walls
+ ];
+
+ let desired=new Map();
+ for(const o of objs){
+  let nr=o.r,nc=o.c;
+  if(kind==='row')nc=(o.c+dir+6)%6;
+  else nr=(o.r+dir+6)%6;
+  desired.set(o.id,[nr,nc]);
+ }
+
+ const lineObjAt=new Map(objs.map(o=>[o.r+','+o.c,o]));
+ const movingWallOrigin=new Set(walls.map(w=>w.r+','+w.c));
+ let moving=new Set(objs.map(o=>o.id));
+
+ let changed=true;
+ while(changed){
+  changed=false;
+  for(const o of objs){
+   if(!moving.has(o.id))continue;
+   const [nr,nc]=desired.get(o.id);
+   const key=nr+','+nc;
+   const ter=battle.terrain[key];
+
+   // BREAK is absolute. LOCK blocks units only.
+   if(ter==='break'||(o.type==='unit'&&isLockedCell(nr,nc,o.u.side))){
+    moving.delete(o.id);changed=true;continue;
+   }
+
+   // A WALL at destination blocks only if that wall is NOT one of the line walls
+   // that is itself still moving away.
+   if(ter==='wall'){
+    const wallObj=lineObjAt.get(key);
+    if(!wallObj || wallObj.type!=='wall' || !moving.has(wallObj.id)){
+      moving.delete(o.id);changed=true;continue;
+    }
+   }
+
+   // A line object that failed to move remains an obstacle.
+   const lineOcc=lineObjAt.get(key);
+   if(lineOcc && !moving.has(lineOcc.id)){
+    moving.delete(o.id);changed=true;continue;
+   }
+
+   // Units outside this moving set are fixed obstacles.
+   const occ=unitAt(nr,nc);
+   if(occ){
+    const oid='u:'+occ.uid;
+    if(!moving.has(oid)){
+      moving.delete(o.id);changed=true;continue;
+    }
+   }
+  }
+ }
+
+ // Clear origins of WALLs that will move.
+ for(const w of walls){
+  if(moving.has(w.id))delete battle.terrain[w.r+','+w.c];
+ }
+
+ // Move units.
+ let movedUnits=[];
+ for(const o of objs){
+  if(!moving.has(o.id)||o.type!=='unit')continue;
+  const [nr,nc]=desired.get(o.id);
+  const old=[o.u.r,o.u.c];
+  o.u.r=nr;o.u.c=nc;
+  o.u.stance=null;o.u.charged=false;o.u.linkTarget=null;o.u.shifterReady=null;
+  movedUnits.push([o.u,old]);
+ }
+
+ // Move WALLs.
+ for(const w of walls){
+  if(!moving.has(w.id))continue;
+  const [nr,nc]=desired.get(w.id);
+  battle.terrain[nr+','+nc]='wall';
+ }
+
+ // Forced-movement reactions resolve after the simultaneous repositioning.
+ for(const [u,old] of movedUnits){
+  if(u.alive)resolveEntry(u,old);
+ }
+
+ battle.pTacticUsed=true;
+ tacticState={};
+ spend();
+}
+function computeHighlights(){
+ let out={move:new Set(),attack:new Set(),deploy:new Set(),tactic:new Set()};
+ if(!battle||battle.turn!=='player')return out;
+ if(battle.cmd==='move'){let u=getUnit(battle.selected);if(u)movementCells(u).forEach(p=>out.move.add(p.join(',')))}
+ if(battle.cmd==='attack'){let u=getUnit(battle.selected);if(u)attackCells(u).forEach(p=>out.attack.add(p.join(',')))}
+ if(battle.cmd==='deploy'){for(let r=4;r<6;r++)for(let c=0;c<6;c++)if(!blocked(r,c,'player'))out.deploy.add(r+','+c)}
+ if(battle.cmd?.startsWith('tactic')){
+  let id=battle.cmd.split(':')[1];
+  if(id==='wall'||id==='break'){
+   for(let r=0;r<6;r++)for(let c=0;c<6;c++)if(!unitAt(r,c)&&!battle.terrain[r+','+c])out.tactic.add(r+','+c);
+  }else if(id==='warp'){
+   if(!tacticState.source){
+    battle.units.filter(u=>u.alive&&u.side==='player').forEach(u=>out.tactic.add(u.r+','+u.c));
+   }else{
+    for(let r=4;r<6;r++)for(let c=0;c<6;c++)if(!blocked(r,c,'player'))out.tactic.add(r+','+c);
+   }
+  }else if(id==='push'){
+   if(!tacticState.source){
+    battle.units.filter(u=>u.alive).forEach(u=>out.tactic.add(u.r+','+u.c));
+   }else{
+    let s=getUnit(tacticState.source);
+    if(s){
+     for(const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+      let r=s.r+dr,c=s.c+dc;
+      if(inside(r,c)&&!blocked(r,c,s.side))out.tactic.add(r+','+c);
+     }
+    }
+   }
+  }else if(id==='swap'){
+   if(!tacticState.source){
+    battle.units.filter(u=>u.alive&&u.side==='player').forEach(u=>out.tactic.add(u.r+','+u.c));
+   }else{
+    battle.units.filter(u=>u.alive&&u.side==='player'&&u.uid!==tacticState.source).forEach(u=>out.tactic.add(u.r+','+u.c));
+   }
+  }else if(id==='shift'){
+   if(!tacticState.shiftCell){
+    for(let r=0;r<6;r++)for(let c=0;c<6;c++)out.tactic.add(r+','+c);
+   }else{
+    let {r,c}=tacticState.shiftCell;
+    for(let i=0;i<6;i++){out.tactic.add(r+','+i);out.tactic.add(i+','+c)}
+   }
+  }else if(id==='lock'){
+   for(let r=0;r<5;r++)for(let c=0;c<5;c++)out.tactic.add(r+','+c);
+  }else{
+   for(let r=0;r<6;r++)for(let c=0;c<6;c++)out.tactic.add(r+','+c);
+  }
+ }
+ return out;
+}
+function killUnit(u){u.alive=false;u.stance=null;u.linkTarget=null;u.shifterReady=null;checkWin()}
+function checkWin(){
+ let p=battle.units.some(u=>u.alive&&u.side==='player'),e=battle.units.some(u=>u.alive&&u.side==='enemy');
+ if(!p&&!e)finish('DRAW');else if(!p)finish('DEFEAT');else if(!e)finish('VICTORY');
+}
+function finish(res){battle.winner=res;setTimeout(()=>overlay(`<div class="small">SIMULATION COMPLETE</div><div class="big">${res}</div><div class="actionRow" style="justify-content:center"><button class="smallbtn primary" onclick="closeOverlay();show('vs')">VS MODE</button><button class="smallbtn" onclick="closeOverlay();show('title')">TITLE</button></div>`),350)}
+function postAction(){checkWin();spend()}
+function endTurn(){
+ if(!battle||battle.winner)return;
+ battle.cmd=null;battle.selected=null;tacticState={};
+ if(battle.turn==='player'){
+  battle.units.filter(u=>u.side==='player'&&u.alive).forEach(u=>{
+   u.deploySick=false;u.attacked=false;
+   if(u.type==='shifter'){
+     if(u.shifterReady==='ready'){u.shifterReady=null;u.stance=null}
+     // 'waiting' must survive this end-turn so it can arm after the enemy turn.
+   }else if(u.stance&&u.type!=='cannon'){u.stance=null;u.linkTarget=null}
+  });
+  battle.turn='enemy';battle.ap=2;renderBattle();setTimeout(cpuTurn,550);
+ }else{
+  battle.units.filter(u=>u.side==='enemy'&&u.alive).forEach(u=>{u.deploySick=false;u.attacked=false;if(u.stance&&u.type!=='cannon'){u.stance=null;u.linkTarget=null}});
+  battle.locks.forEach(L=>{if(L.side==='enemy')L.turns--;});battle.locks=battle.locks.filter(L=>L.turns>0);
+  battle.units.filter(u=>u.alive&&u.side==='player'&&u.type==='shifter'&&u.shifterReady==='waiting').forEach(u=>u.shifterReady='ready');
+  battle.turn='player';battle.ap=2;battle.round++;renderBattle();
+ }
+}
+function cpuTurn(){
+ if(battle.turn!=='enemy'||battle.winner)return;
+ // Simple AI: deploy if reserve and <=2 board units, attack if possible, else move toward nearest enemy, sometimes stance
+ if(battle.eReserve&&battle.units.filter(u=>u.alive&&u.side==='enemy').length<=2&&battle.ap>0){
+  let spots=[];for(let r=0;r<2;r++)for(let c=0;c<6;c++)if(!blocked(r,c,'enemy'))spots.push([r,c]);
+  if(spots.length){let [r,c]=spots[Math.floor(Math.random()*spots.length)];let u=makeUnit('ed'+Date.now(),battle.eReserve,'enemy',r,c);u.deploySick=true;battle.units.push(u);battle.eReserve=null;battle.ap--}
+ }
+ const act=()=>{
+  // A previously scheduled CPU callback may fire after the turn has already changed.
+  // In that case it must do nothing.
+  if(battle.turn!=='enemy'||battle.winner)return;
+  if(battle.ap<=0){endTurn();return}
+  let enemies=battle.units.filter(u=>u.alive&&u.side==='enemy'),players=battle.units.filter(u=>u.alive&&u.side==='player');
+  for(const u of enemies){
+   if(u.deploySick)continue;
+   let cells=attackCells(u);let t=players.find(p=>cells.some(x=>x[0]===p.r&&x[1]===p.c));
+   if(t){battle.selected=u.uid;tryAttack(t.r,t.c);setTimeout(act,450);return}
+  }
+  let u=enemies[Math.floor(Math.random()*enemies.length)];
+  if(!u){endTurn();return}
+  if(Math.random()<.25&&!u.deploySick&&!u.attacked){battle.stanceSeq++;u.stance=CHARS[u.type].stance;u.stanceOrder=battle.stanceSeq;if(u.type==='cannon')u.charged=true;battle.ap--;renderBattle();setTimeout(act,450);return}
+  let moves=movementCells(u);if(moves.length&&players.length){
+   moves.sort((a,b)=>nearestDist(a,players)-nearestDist(b,players));let [r,c]=moves[0],from=[u.r,u.c];u.r=r;u.c=c;u.stance=null;u.charged=false;u.linkTarget=null;resolveEntry(u,from);battle.ap--;renderBattle();setTimeout(act,450);return
+  }
+  battle.ap=0;renderBattle();setTimeout(act,250)
+ };
+ act();
+}
+function nearestDist(p,arr){return Math.min(...arr.map(u=>Math.abs(u.r-p[0])+Math.abs(u.c-p[1])))}
+function inside(r,c){return r>=0&&r<6&&c>=0&&c<6}
+function overlay(h){document.getElementById('overlayContent').innerHTML=h;document.getElementById('overlay').classList.add('show')}
+function closeOverlay(){document.getElementById('overlay').classList.remove('show')}
+let holdTimer;
+function holdDetail(e,id){clearTimeout(holdTimer);holdTimer=setTimeout(()=>charDetail(id),420);const clear=()=>clearTimeout(holdTimer);e.currentTarget?.addEventListener('pointerup',clear,{once:true})}
+function charDetail(id){
+ let c=CHARS[id],m=CHAR_META[id];
+ overlay(`<div class="small">UNIT DATABASE</div><div class="big" style="font-size:30px">${GAME_ASSETS[id]?.symbol?`<img class="classSymbolMini" src="${GAME_ASSETS[id].symbol}" alt="">`:''}${c.name}</div>
+ <div class="tags" style="justify-content:center">${m.tags.map(x=>`<span class="tag">${x}</span>`).join('')}</div>
+ <div class="statCols" style="margin-top:12px">
+   <div class="rangeBox"><div class="rangeTitle">MOVE</div>${rangeHtml(id,'move')}</div>
+   <div class="rangeBox"><div class="rangeTitle">ATTACK</div>${rangeHtml(id,'attack')}</div>
+ </div>
+ <div class="explainBox"><div class="explainName">STANCE // ${c.stance}</div><div class="explainText">${m.stanceDesc}</div></div>
+ <div class="explainBox"><div class="explainName">UNIT NOTES</div><div class="explainText">${m.desc}</div></div>
+ <div class="actionRow"><button class="smallbtn" onclick="closeOverlay()">CLOSE</button></div>`)
+}
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeOverlay()});
+syncActivePreset();renderTeam();
+</script>
+</body>
+</html>
