@@ -295,6 +295,14 @@ h2{letter-spacing:.16em;margin:4px 0 18px;font-size:24px}
   100%{opacity:0}
 }
 
+
+.interceptSourceFx{position:absolute;inset:0;z-index:12;pointer-events:none;border:2px solid rgba(120,205,255,.95);border-radius:8px;animation:sourcePulse .48s ease-out forwards;box-shadow:0 0 18px rgba(90,190,255,.8)}
+.interceptImpactFx{position:absolute;inset:5%;z-index:14;pointer-events:none;animation:impactFlash .48s ease-out forwards}
+.interceptImpactFx::before,.interceptImpactFx::after{content:"";position:absolute;left:8%;right:8%;top:49%;height:3px;background:rgba(225,245,255,.96);box-shadow:0 0 10px rgba(90,190,255,.9);transform:rotate(38deg)}
+.interceptImpactFx::after{transform:rotate(-38deg)}
+@keyframes sourcePulse{0%{opacity:0;transform:scale(.86)}25%{opacity:1;transform:scale(1.06)}100%{opacity:0;transform:scale(1)}}
+@keyframes impactFlash{0%{opacity:0;transform:scale(.55) rotate(-8deg)}22%{opacity:1;transform:scale(1.1) rotate(0)}100%{opacity:0;transform:scale(1.25)}}
+
 </style>
   <!-- GitHub Pages build: external assets -->
 </head>
@@ -874,6 +882,15 @@ function renderBattle(){
    }
   }
 
+  if(battleFx&&battleFx.kind==='bladeIntercept'&&battleFx.phase==='impact'){
+   if(r===battleFx.source[0]&&c===battleFx.source[1]){
+    let fx=document.createElement('div');fx.className='interceptSourceFx';cell.appendChild(fx);
+   }
+   if(r===battleFx.target[0]&&c===battleFx.target[1]){
+    let fx=document.createElement('div');fx.className='interceptImpactFx';cell.appendChild(fx);
+   }
+  }
+
   let u=unitAt(r,c);
   if(u){
    cell.insertAdjacentHTML('beforeend',unitHtml(u.type,u.side==='enemy',battle.selected===u.uid,!!u.stance,u.charged,u.deploySick));
@@ -1077,6 +1094,7 @@ function tryMove(r,c){
 
  spend();
 }
+let battleFx=null;
 let cutinBusy=false;
 function playBattleCutin(type){
  if(type!=='blade')return Promise.resolve();
@@ -1107,17 +1125,40 @@ function resolveEntry(mover,from){
  if(!reactors.length)return;
 
  let r=reactors[0];
+ let src=[r.r,r.c],dst=[mover.r,mover.c];
  r.stance=null;
  r.linkTarget=null;
 
- // Resolve the game state immediately. The cut-in is presentation only.
- // This prevents CPU/player actions from continuing while the intercepted
- // mover is temporarily still alive.
- killUnit(mover);
-
  if(r.type==='blade'){
+  // Keep the intercepted unit visible during the cut-in.
+  // CPU/player processing is paused by cutinBusy until the cut-in ends.
+  mover.pendingDeath=true;
+  battleFx={kind:'bladeIntercept',source:src,target:dst,phase:'cutin'};
   renderBattle();
-  playBattleCutin('blade');
+
+  playBattleCutin('blade').then(()=>{
+   if(!battle)return;
+
+   // The actual elimination happens AFTER the cut-in.
+   if(mover.alive){
+    mover.pendingDeath=false;
+    killUnit(mover);
+   }
+   if(battle.selected===mover.uid)battle.selected=null;
+
+   battleFx={kind:'bladeIntercept',source:src,target:dst,phase:'impact'};
+   renderBattle();
+
+   setTimeout(()=>{
+    if(battleFx&&battleFx.kind==='bladeIntercept'){
+     battleFx=null;
+     if(battle)renderBattle();
+    }
+   },500);
+  });
+ }else{
+  // GUNNER remains immediate because it currently has no cut-in.
+  killUnit(mover);
  }
 }
 function tryAttack(r,c){
@@ -1467,10 +1508,13 @@ function cpuTurn(){
   // A previously scheduled CPU callback may fire after the turn has already changed.
   // In that case it must do nothing.
   if(battle.turn!=='enemy'||battle.winner)return;
+  if(cutinBusy){setTimeout(act,100);return}
   if(battle.ap<=0){endTurn();return}
-  let enemies=battle.units.filter(u=>u.alive&&u.side==='enemy'),players=battle.units.filter(u=>u.alive&&u.side==='player');
+  let enemies=battle.units.filter(u=>u.alive&&!u.pendingDeath&&u.side==='enemy'),players=battle.units.filter(u=>u.alive&&!u.pendingDeath&&u.side==='player');
   for(const u of enemies){
-   if(u.deploySick)continue;
+   // A unit may ATTACK only once per turn. Do not repeatedly call tryAttack
+   // after its attack has already been spent, or the CPU can soft-lock.
+   if(u.deploySick||u.attacked)continue;
    let cells=attackCells(u);let t=players.find(p=>cells.some(x=>x[0]===p.r&&x[1]===p.c));
    if(t){battle.selected=u.uid;tryAttack(t.r,t.c);setTimeout(act,450);return}
   }
@@ -1478,7 +1522,7 @@ function cpuTurn(){
   if(!u){endTurn();return}
   if(Math.random()<.25&&!u.deploySick&&!u.attacked){battle.stanceSeq++;u.stance=CHARS[u.type].stance;u.stanceOrder=battle.stanceSeq;if(u.type==='cannon')u.charged=true;if(u.type==='shifter')u.shifterReady='waiting';battle.ap--;renderBattle();setTimeout(act,450);return}
   let moves=movementCells(u);if(moves.length&&players.length){
-   moves.sort((a,b)=>nearestDist(a,players)-nearestDist(b,players));let [r,c]=moves[0],from=[u.r,u.c];u.r=r;u.c=c;u.stance=null;u.charged=false;u.linkTarget=null;resolveEntry(u,from);battle.ap--;renderBattle();setTimeout(act,450);return
+   moves.sort((a,b)=>nearestDist(a,players)-nearestDist(b,players));let [r,c]=moves[0],from=[u.r,u.c];u.r=r;u.c=c;u.stance=null;u.charged=false;u.linkTarget=null;resolveEntry(u,from);if(!u.alive)battle.selected=null;battle.ap--;renderBattle();setTimeout(act,450);return
   }
   battle.ap=0;renderBattle();setTimeout(act,250)
  };

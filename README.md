@@ -2,10 +2,10 @@
 
 GitHub root-level build.
 
-Fixes in this build:
-- Reaction STANCE states remain active through the opponent's turn.
-- BLADE INTERCEPT resolves elimination immediately; cut-in is presentation only.
-- GUARD / SCOUT / DUELIST reaction stances now survive into the opponent turn as intended.
-- CPU SHIFTER stance arming is kept consistent.
+v5:
+- BLADE INTERCEPT cut-in duration restored to ~0.72 seconds.
+- Intercepted unit remains visible during the cut-in.
+- Unit is eliminated immediately after the cut-in finishes.
+- CPU remains paused during the cut-in to avoid race conditions.
 
-Upload every file directly to the repository root.
+Upload all files directly to the repository root.
