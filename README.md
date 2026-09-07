@@ -1,13 +1,11 @@
 # PROJECT ARENA
 
-GitHub Web Upload-friendly build.
+GitHub root-level build.
 
-Upload all files directly to the repository root:
+Fixes in this build:
+- Reaction STANCE states remain active through the opponent's turn.
+- BLADE INTERCEPT resolves elimination immediately; cut-in is presentation only.
+- GUARD / SCOUT / DUELIST reaction stances now survive into the opponent turn as intended.
+- CPU SHIFTER stance arming is kept consistent.
 
-- index.html
-- blade_face.png
-- blade_unit.png
-- blade_symbol.png
-- blade_intercept.png
-
-This build intentionally uses root-level image paths instead of an `assets/` folder.
+Upload every file directly to the repository root.

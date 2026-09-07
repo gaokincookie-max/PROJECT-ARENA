@@ -372,7 +372,7 @@ h2{letter-spacing:.16em;margin:4px 0 18px;font-size:24px}
  <div class="status" id="turnStatus">SIMULATION</div>
  <div class="boardWrap"><div id="battleBoard" class="board"></div></div>
  <div id="battleCutinBackdrop" class="battleCutinBackdrop"></div>
- <div id="battleCutin" class="battleCutin"><img src="blade_intercept.png" alt="BLADE INTERCEPT"></div>
+ <div id="battleCutin" class="battleCutin"><img src="./blade_intercept.png" alt="BLADE INTERCEPT"></div>
  <div id="shiftControls" class="shiftControls">
    <button class="shiftDir" onclick="confirmShiftDir('row',-1)">←</button>
    <button class="shiftDir" onclick="confirmShiftDir('row',1)">→</button>
@@ -429,9 +429,9 @@ h2{letter-spacing:.16em;margin:4px 0 18px;font-size:24px}
 
 const GAME_ASSETS={
  blade:{
-  face:"blade_face.png",
-  unit:"blade_unit.png",
-  symbol:"blade_symbol.png"
+  face:"./blade_face.png",
+  unit:"./blade_unit.png",
+  symbol:"./blade_symbol.png"
  }
 };
 function hasGameFace(id){return !!(GAME_ASSETS[id] && GAME_ASSETS[id].face)}
@@ -1096,20 +1096,28 @@ function playBattleCutin(type){
 }
 
 function resolveEntry(mover,from){
- let reactors=battle.units.filter(x=>x.alive&&x.side!==mover.side&&x.stance&&['blade','gunner'].includes(x.type))
- .filter(x=>attackCells(x,true).some(p=>p[0]===mover.r&&p[1]===mover.c)&&!attackCells(x,true).some(p=>p[0]===from[0]&&p[1]===from[1]))
- .sort((a,b)=>a.stanceOrder-b.stanceOrder);
- if(reactors.length){
-  let r=reactors[0];
-  r.stance=null;r.linkTarget=null;
-  if(r.type==='blade'){
-   playBattleCutin('blade').then(()=>{
-    if(mover.alive)killUnit(mover);
-    if(battle)renderBattle();
-   });
-  }else{
-   killUnit(mover);
-  }
+ let reactors=battle.units
+  .filter(x=>x.alive&&x.side!==mover.side&&x.stance&&['blade','gunner'].includes(x.type))
+  .filter(x=>
+   attackCells(x,true).some(p=>p[0]===mover.r&&p[1]===mover.c) &&
+   !attackCells(x,true).some(p=>p[0]===from[0]&&p[1]===from[1])
+  )
+  .sort((a,b)=>a.stanceOrder-b.stanceOrder);
+
+ if(!reactors.length)return;
+
+ let r=reactors[0];
+ r.stance=null;
+ r.linkTarget=null;
+
+ // Resolve the game state immediately. The cut-in is presentation only.
+ // This prevents CPU/player actions from continuing while the intercepted
+ // mover is temporarily still alive.
+ killUnit(mover);
+
+ if(r.type==='blade'){
+  renderBattle();
+  playBattleCutin('blade');
  }
 }
 function tryAttack(r,c){
@@ -1390,20 +1398,62 @@ function postAction(){checkWin();spend()}
 function endTurn(){
  if(!battle||battle.winner)return;
  battle.cmd=null;battle.selected=null;tacticState={};
+
  if(battle.turn==='player'){
+  // End of PLAYER turn: reset PLAYER per-turn restrictions.
+  // Do NOT clear PLAYER reaction stances here; they must remain active
+  // throughout the upcoming ENEMY turn.
   battle.units.filter(u=>u.side==='player'&&u.alive).forEach(u=>{
-   u.deploySick=false;u.attacked=false;
-   if(u.type==='shifter'){
-     if(u.shifterReady==='ready'){u.shifterReady=null;u.stance=null}
-     // 'waiting' must survive this end-turn so it can arm after the enemy turn.
-   }else if(u.stance&&u.type!=='cannon'){u.stance=null;u.linkTarget=null}
+   u.deploySick=false;
+   u.attacked=false;
   });
-  battle.turn='enemy';battle.ap=2;renderBattle();setTimeout(cpuTurn,550);
+
+  // ENEMY stances that survived the previous PLAYER turn now expire
+  // as the ENEMY's next turn begins (CANNON charge persists).
+  battle.units.filter(u=>u.side==='enemy'&&u.alive).forEach(u=>{
+   if(u.type==='shifter'){
+    if(u.shifterReady==='waiting')u.shifterReady='ready';
+    else if(u.shifterReady==='ready'){u.shifterReady=null;u.stance=null}
+   }else if(u.stance&&u.type!=='cannon'){
+    u.stance=null;u.linkTarget=null;
+   }
+  });
+
+  battle.turn='enemy';
+  battle.ap=2;
+  renderBattle();
+  setTimeout(cpuTurn,550);
+
  }else{
-  battle.units.filter(u=>u.side==='enemy'&&u.alive).forEach(u=>{u.deploySick=false;u.attacked=false;if(u.stance&&u.type!=='cannon'){u.stance=null;u.linkTarget=null}});
-  battle.locks.forEach(L=>{if(L.side==='enemy')L.turns--;});battle.locks=battle.locks.filter(L=>L.turns>0);
-  battle.units.filter(u=>u.alive&&u.side==='player'&&u.type==='shifter'&&u.shifterReady==='waiting').forEach(u=>u.shifterReady='ready');
-  battle.turn='player';battle.ap=2;battle.round++;renderBattle();
+  // End of ENEMY turn: reset ENEMY per-turn restrictions.
+  // Do NOT clear freshly set ENEMY reaction stances here.
+  battle.units.filter(u=>u.side==='enemy'&&u.alive).forEach(u=>{
+   u.deploySick=false;
+   u.attacked=false;
+  });
+
+  battle.locks.forEach(L=>{if(L.side==='enemy')L.turns--;});
+  battle.locks=battle.locks.filter(L=>L.turns>0);
+
+  // PLAYER stances that survived the ENEMY turn expire as the PLAYER's
+  // next turn begins. SHIFTER instead becomes ready for its formation move.
+  battle.units.filter(u=>u.alive&&u.side==='player').forEach(u=>{
+   if(u.type==='shifter'){
+    if(u.shifterReady==='waiting'){
+     u.shifterReady='ready';
+    }else if(u.shifterReady==='ready'){
+     u.shifterReady=null;
+     u.stance=null;
+    }
+   }else if(u.stance&&u.type!=='cannon'){
+    u.stance=null;u.linkTarget=null;
+   }
+  });
+
+  battle.turn='player';
+  battle.ap=2;
+  battle.round++;
+  renderBattle();
  }
 }
 function cpuTurn(){
@@ -1426,7 +1476,7 @@ function cpuTurn(){
   }
   let u=enemies[Math.floor(Math.random()*enemies.length)];
   if(!u){endTurn();return}
-  if(Math.random()<.25&&!u.deploySick&&!u.attacked){battle.stanceSeq++;u.stance=CHARS[u.type].stance;u.stanceOrder=battle.stanceSeq;if(u.type==='cannon')u.charged=true;battle.ap--;renderBattle();setTimeout(act,450);return}
+  if(Math.random()<.25&&!u.deploySick&&!u.attacked){battle.stanceSeq++;u.stance=CHARS[u.type].stance;u.stanceOrder=battle.stanceSeq;if(u.type==='cannon')u.charged=true;if(u.type==='shifter')u.shifterReady='waiting';battle.ap--;renderBattle();setTimeout(act,450);return}
   let moves=movementCells(u);if(moves.length&&players.length){
    moves.sort((a,b)=>nearestDist(a,players)-nearestDist(b,players));let [r,c]=moves[0],from=[u.r,u.c];u.r=r;u.c=c;u.stance=null;u.charged=false;u.linkTarget=null;resolveEntry(u,from);battle.ap--;renderBattle();setTimeout(act,450);return
   }
@@ -1454,6 +1504,15 @@ function charDetail(id){
 }
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeOverlay()});
 syncActivePreset();renderTeam();
+
+window.addEventListener('load',()=>{
+ document.querySelectorAll('img').forEach(img=>{
+  img.addEventListener('error',()=>{
+   console.error('IMAGE LOAD FAILED:', img.getAttribute('src'), 'resolved:', img.src);
+  });
+ });
+});
+
 </script>
 </body>
 </html>
